@@ -6,9 +6,10 @@ from fsspec.core import get_fs_token_paths
 from pyarrow import dataset as pa_ds
 
 from dask.base import tokenize
-from dask.delayed import delayed
 from dask.dataframe.io import from_delayed
 from dask.dataframe.io.parquet.core import get_engine
+from dask.delayed import delayed
+
 from .utils import (
     FASTPARQUET_CHECKPOINT_SCHEMA,
     PYARROW_CHECKPOINT_SCHEMA,
