@@ -17,7 +17,7 @@ setup(
     long_description_content_type="text/markdown",
     python_requires=">=3.7",
     install_requires=open("requirements.txt").read().strip().split("\n"),
-    extras_require={"dev": ["pytest","requests","pytest-cov>=2.10.1"]},
+    extras_require={"dev": ["pytest", "requests", "pytest-cov>=2.10.1"]},
     include_package_data=True,
     zip_safe=False,
 )
