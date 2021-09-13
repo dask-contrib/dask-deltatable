@@ -37,7 +37,20 @@ jobs:
           auto-activate-base: false
 
       - name: Install dask-deltatable
-        run: python -m pip install --no-deps -e .
+        run: python -m pip install -e ".[dev]"
 
       - name: Run tests
-        run: python -m pytest tests
+        run: python -m pytest --junitxml=junit/test-results.xml --cov-report=xml tests
+
+      - name: Upload pytest test results
+        uses: actions/upload-artifact@v1
+        with:
+          name: pytest-results
+          path: junit/test-results.xml
+        # Use always() to always run this step to publish test results when there are test failures
+        if: ${{ always() }}
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
