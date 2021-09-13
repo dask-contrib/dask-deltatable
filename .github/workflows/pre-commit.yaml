@@ -1,14 +1,9 @@
-name: Linting
-
-on:
-  push:
-    branches: main
-  pull_request:
-    branches: main
+---
+name: Python Style Check
+on: [pull_request]
 
 jobs:
-  checks:
-    name: "pre-commit hooks"
+  pre-commit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
