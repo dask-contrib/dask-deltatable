@@ -1,0 +1,43 @@
+name: Tests
+
+on: [push, pull_request]
+
+# When this workflow is queued, automatically cancel any previous running
+# or pending jobs from the same branch
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -l {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["windows-latest", "ubuntu-latest", "macos-latest"]
+        python-version: ["3.7", "3.8", "3.9"]
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Needed by codecov.io
+
+      - name: Setup Conda Environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniforge-version: latest
+          channel-priority: strict
+          python-version: ${{ matrix.python-version }}
+          environment-file: continous_integeration/environment-${{ matrix.python-version }}.yaml
+          activate-environment: test-environment
+          auto-activate-base: false
+
+      - name: Install dask-deltatable
+        run: python -m pip install --no-deps -e .
+
+      - name: Run tests
+        run: python -m pytest tests
