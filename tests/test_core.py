@@ -65,11 +65,7 @@ def test_read_delta_with_different_versions(simple_table):
 
 def test_row_filter(simple_table):
     # row filter
-    df = ddt.read_delta_table(
-        simple_table,
-        version=0,
-        filter=[("count", ">", 30)],
-    )
+    df = ddt.read_delta_table(simple_table, version=0, filter=[("count", ">", 30)],)
     assert df.compute().shape == (61, 3)
 
 
