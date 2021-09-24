@@ -1,2 +1,3 @@
 dask[dataframe,distributed]
 pyarrow
+deltalake
