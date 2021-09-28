@@ -1,14 +1,10 @@
 import glob
 import os
 import zipfile
-from io import BytesIO
 
 import pytest
-from dask.utils import homogeneous_deepmap
 
 import dask_deltatable as ddt
-
-requests = pytest.importorskip("requests")
 
 
 @pytest.fixture()
