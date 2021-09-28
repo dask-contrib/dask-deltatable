@@ -86,7 +86,7 @@ class DeltaTableWrapper(object):
 
     def _vacuum_helper(self, filename_to_delete):
         full_path = urlparse(self.path)
-        if full_path.scheme:  # pragma no cover
+        if full_path.scheme and full_path.netloc:  # pragma no cover
             # for different storage backend, delta-rs vacuum gives path to the file
             # it will not provide bucket name and scheme s3 or gcfs etc. so adding
             # manually

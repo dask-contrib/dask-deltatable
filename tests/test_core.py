@@ -64,7 +64,7 @@ def vacuum_table(tmpdir):
     output_dir = tmpdir
     deltaf = zipfile.ZipFile("tests/data/vacuum.zip")
     deltaf.extractall(output_dir)
-    return str(output_dir) + "/vaccum_table/"
+    return str(output_dir) + "/vaccum_table"
 
 
 def test_read_delta(simple_table):
@@ -218,9 +218,8 @@ def test_vacuum(vacuum_table):
     print(tombstones)
     assert len(tombstones) == 4
 
-    before_pq_files_len = len(glob.glob(f"{vacuum_table}*.parquet"))
+    before_pq_files_len = len(glob.glob(f"{vacuum_table}/*.parquet"))
     assert before_pq_files_len == 7
     tombstones = ddt.vacuum(vacuum_table, dry_run=False)
-    print(tombstones)
-    after_pq_files_len = len(glob.glob(f"{vacuum_table}*.parquet"))
+    after_pq_files_len = len(glob.glob(f"{vacuum_table}/*.parquet"))
     assert after_pq_files_len == 3
