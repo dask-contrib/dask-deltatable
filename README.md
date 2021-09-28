@@ -45,4 +45,8 @@ ddt.read_delta_history("delta_path",limit=5)
 # read delta history to delete the files
 ddt.vacuum("delta_path",dry_run=False)
 
+# Can read from S3,azure,gcfs etc.
+ddt.read_delta_table("s3://bucket_name/delta_path",version=3)
+# please ensure the credentials are properly configured as environment variable or
+# configured as in ~/.aws/credential
 ```
