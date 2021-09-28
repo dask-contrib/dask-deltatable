@@ -62,7 +62,7 @@ def checkpoint_table(tmpdir):
 @pytest.fixture()
 def vacuum_table(tmpdir):
     output_dir = tmpdir
-    deltaf = zipfile.ZipFile("vacuum.zip")
+    deltaf = zipfile.ZipFile("tests/data/vacuum.zip")
     deltaf.extractall(output_dir)
     return str(output_dir) + "/vaccum_table/"
 
