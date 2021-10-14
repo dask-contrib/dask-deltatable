@@ -1,196 +1,33 @@
 import json
-import re
+import os
+from urllib.parse import urlparse
 
+import dask
 import pyarrow.parquet as pq
 from dask.base import tokenize
 from dask.dataframe.io import from_delayed
-from dask.dataframe.io.parquet.core import get_engine
 from dask.delayed import delayed
+from deltalake import DeltaTable
 from fsspec.core import get_fs_token_paths
 from pyarrow import dataset as pa_ds
 
-from .utils import (
-    FASTPARQUET_CHECKPOINT_SCHEMA,
-    PYARROW_CHECKPOINT_SCHEMA,
-    schema_from_string,
-)
 
-__all__ = ["read_delta_table"]
-
-
-class DeltaTable:
-    """
-    Core DeltaTable Read Algorithm
-
-    Parameters
-    ----------
-    path: str
-        path of Delta table directory
-    version: int, default 0
-        DeltaTable Version, used for Time Travelling across the
-        different versions of the parquet datasets
-    columns: None or list(str)
-        Columns to load. If None, loads all.
-    engine : str, default 'auto'
-        Parquet reader library to use. Options include: 'auto', 'fastparquet',
-        'pyarrow', 'pyarrow-dataset', and 'pyarrow-legacy'. Defaults to 'auto',
-        which selects the FastParquetEngine if fastparquet is installed (and
-        ArrowDatasetEngine otherwise).  If 'pyarrow' or 'pyarrow-dataset' is
-        specified, the ArrowDatasetEngine (which leverages the pyarrow.dataset
-        API) will be used. If 'pyarrow-legacy' is specified, ArrowLegacyEngine
-        will be used (which leverages the pyarrow.parquet.ParquetDataset API).
-        NOTE: The 'pyarrow-legacy' option (ArrowLegacyEngine) is deprecated
-        for pyarrow>=5.
-    checkpoint: int, default None
-        DeltaTable protocol aggregates the json delta logs and creates parquet
-        checkpoint for every 10 versions.This will save some IO.
-        for example:
-            if you want to read 106th version of dataset, No need to read all
-            the all the 106 json files (which isIO heavy), instead read 100th
-            parquet checkpoint which contains all the logs of 100 versions in single
-            parquet file and now read the extra 6 json files to match the given
-            106th version.
-            (so IO reduced from 106 to 7)
-    storage_options : dict, default None
-        Key/value pairs to be passed on to the file-system backend, if any.
-    """
-
+class DeltaTableWrapper(object):
     def __init__(
-        self,
-        path: str,
-        version: int = 0,
-        columns=None,
-        engine="auto",
-        checkpoint=None,
-        storage_options=None,
-    ):
-        self.path = str(path).rstrip("/")
+        self, path, version, columns, datetime=None, storage_options=None
+    ) -> None:
+        self.path = path
         self.version = version
-        self.pq_files = set()
-        self.delta_log_path = f"{self.path}/_delta_log"
+        self.columns = columns
+        self.datetime = datetime
+        self.storage_options = storage_options
+        self.dt = DeltaTable(table_uri=self.path, version=self.version)
         self.fs, self.fs_token, _ = get_fs_token_paths(
             path, storage_options=storage_options
         )
-        self.engine = engine
-        self.columns = columns
-        self.checkpoint = (
-            checkpoint if checkpoint is not None else self.get_checkpoint_id()
-        )
-        self.storage_options = storage_options
-        self.schema = None
-
-    def get_checkpoint_id(self):
-        """
-        if _last_checkpoint file exists, returns checkpoint_id else zero
-        """
-        try:
-            last_checkpoint_version = json.loads(
-                self.fs.cat(f"{self.delta_log_path}/_last_checkpoint")
-            )["version"]
-        except FileNotFoundError:
-            last_checkpoint_version = 0
-        return last_checkpoint_version
-
-    def get_pq_files_from_checkpoint_parquet(self):
-        """
-        use checkpoint_id to get logs from parquet files
-        """
-        if self.checkpoint == 0:
-            return
-        checkpoint_path = (
-            f"{self.delta_log_path}/{self.checkpoint:020}.checkpoint.parquet"
-        )
-        if not self.fs.exists(checkpoint_path):
-            raise ValueError(
-                f"Parquet file with the given checkpoint {self.checkpoint} does not exists: "
-                f"File {checkpoint_path} not found"
-            )
-
-        # reason for this `if condition` was that FastParquetEngine seems to normalizes the json present in each column
-        # not sure whether there is a better solution for handling this .
-        # `https://fastparquet.readthedocs.io/en/latest/details.html#reading-nested-schema`
-        if self.engine.__name__ == "ArrowDatasetEngine":
-            parquet_checkpoint = self.engine.read_partition(
-                fs=self.fs,
-                pieces=[(checkpoint_path, None, None)],
-                columns=PYARROW_CHECKPOINT_SCHEMA,
-                index=None,
-            )
-            for i, row in parquet_checkpoint.iterrows():
-                if row["metaData"] is not None:
-                    # get latest schema/columns , since delta Lake supports Schema Evolution.
-                    self.schema = schema_from_string(row["metaData"]["schemaString"])
-                elif row["add"] is not None:
-                    self.pq_files.add(f"{self.path}/{row['add']['path']}")
-
-        elif self.engine.__name__ == "FastParquetEngine":
-            parquet_checkpoint = self.engine.read_partition(
-                fs=self.fs,
-                pieces=[(checkpoint_path, None, None)],
-                columns=FASTPARQUET_CHECKPOINT_SCHEMA,
-                index=None,
-            )
-            for i, row in parquet_checkpoint.iterrows():
-                if row["metaData.schemaString"]:
-                    self.schema = schema_from_string(row["metaData.schemaString"])
-                elif row["add.path"]:
-                    self.pq_files.add(f"{self.path}/{row['add.path']}")
-
-    def get_pq_files_from_delta_json_logs(self):
-        """
-        start from checkpoint id, collect logs from every json file until the
-        given version
-        example:
-            checkpoint 10, version 16
-                1. read the logs from 10th checkpoint parquet ( using above func)
-                2. read logs from json files until version 16
-        log Collection:
-            for reading the particular version of delta table, We are concerned
-            about `add` and `remove` Operation (transaction) only.(which involves
-            adding and removing respective parquet file transaction)
-        """
-        log_files = self.fs.glob(
-            f"{self.delta_log_path}/{self.checkpoint // 10:019}*.json"
-        )
-        if len(log_files) == 0:
-            raise RuntimeError(
-                f"No Json files found at _delta_log_path:- {self.delta_log_path}"
-            )
-        log_files = sorted(log_files)
-        log_versions = [
-            int(re.findall(r"(\d{20})", log_file_name)[0])
-            for log_file_name in log_files
-        ]
-        if (self.version is not None) and (self.version not in log_versions):
-            raise ValueError(
-                f"Cannot time travel Delta table to version {self.version}, Available versions for given "
-                f"checkpoint {self.checkpoint} are {log_versions}"
-            )
-        for log_file_name, log_version in zip(log_files, log_versions):
-            log = self.fs.cat(log_file_name).decode().split("\n")
-            for line in log:
-                if line:  # for last empty line
-                    meta_data = json.loads(line)
-                    if "add" in meta_data.keys():
-                        file = f"{self.path}/{meta_data['add']['path']}"
-                        self.pq_files.add(file)
-
-                    elif "remove" in meta_data.keys():
-                        remove_file = f"{self.path}/{meta_data['remove']['path']}"
-                        if remove_file in self.pq_files:
-                            self.pq_files.remove(remove_file)
-                    elif "metaData" in meta_data.keys():
-                        schema_string = meta_data["metaData"]["schemaString"]
-                        self.schema = schema_from_string(schema_string)
-
-            if self.version == int(log_version):
-                break
+        self.schema = self.dt.pyarrow_schema()
 
     def read_delta_dataset(self, f, **kwargs):
-        """
-        Function to read single parquet file using pyarrow dataset (to support
-        schema evolution)
-        """
         schema = kwargs.pop("schema", None) or self.schema
         filter = kwargs.pop("filter", None)
         if filter:
@@ -220,31 +57,106 @@ class DeltaTable:
                 meta[field.name] = field.type.to_pandas_dtype()
         return meta
 
+    def _history_helper(self, log_file_name):
+        log = self.fs.cat(log_file_name).decode().split("\n")
+        for line in log:
+            if line:
+                meta_data = json.loads(line)
+                if "commitInfo" in meta_data:
+                    return meta_data["commitInfo"]
+
+    def history(self, limit=None, **kwargs):
+        delta_log_path = str(self.path).rstrip("/") + "/_delta_log"
+        log_files = self.fs.glob(f"{delta_log_path}/*.json")
+        if len(log_files) == 0:  # pragma no cover
+            raise RuntimeError(f"No History (logs) found at:- {delta_log_path}/")
+        log_files = sorted(log_files, reverse=True)
+        if limit is None:
+            last_n_files = log_files
+        else:
+            last_n_files = log_files[:limit]
+        parts = [
+            delayed(
+                self._history_helper,
+                name="read-delta-history" + tokenize(self.fs_token, f, **kwargs),
+            )(f, **kwargs)
+            for f in list(last_n_files)
+        ]
+        return dask.compute(parts)[0]
+
+    def _vacuum_helper(self, filename_to_delete):
+        full_path = urlparse(self.path)
+        if full_path.scheme and full_path.netloc:  # pragma no cover
+            # for different storage backend, delta-rs vacuum gives path to the file
+            # it will not provide bucket name and scheme s3 or gcfs etc. so adding
+            # manually
+            filename_to_delete = (
+                f"{full_path.scheme}://{full_path.netloc}/{filename_to_delete}"
+            )
+        self.fs.rm_file(filename_to_delete)
+
+    def vacuum(self, retention_hours=168, dry_run=True):
+        """
+        Run the Vacuum command on the Delta Table: list and delete files no
+        longer referenced by the Delta table and are older than the
+        retention threshold.
+
+        retention_hours: the retention threshold in hours, if none then
+        the value from `configuration.deletedFileRetentionDuration` is used
+         or default of 1 week otherwise.
+        dry_run: when activated, list only the files, delete otherwise
+
+        Returns
+        -------
+        the list of files no longer referenced by the Delta Table and are
+         older than the retention threshold.
+        """
+
+        tombstones = self.dt.vacuum(retention_hours=retention_hours)
+        if dry_run:
+            return tombstones
+        else:
+            parts = [
+                delayed(
+                    self._vacuum_helper,
+                    name="delta-vacuum"
+                    + tokenize(self.fs_token, f, retention_hours, dry_run),
+                )(f)
+                for f in tombstones
+            ]
+        dask.compute(parts)[0]
+
+    def get_pq_files(self):
+        """
+        get the list of parquet files after loading the
+        current datetime version
+        """
+        __doc__ == self.dt.load_with_datetime.__doc__
+
+        if self.datetime is not None:
+            self.dt.load_with_datetime(self.datetime)
+        return self.dt.file_uris()
+
     def read_delta_table(self, **kwargs):
         """
         Reads the list of parquet files in parallel
         """
-        if len(self.pq_files) == 0:
+        pq_files = self.get_pq_files()
+        if len(pq_files) == 0:
             raise RuntimeError("No Parquet files are available")
         parts = [
             delayed(
                 self.read_delta_dataset,
                 name="read-delta-table-" + tokenize(self.fs_token, f, **kwargs),
             )(f, **kwargs)
-            for f in list(self.pq_files)
+            for f in list(pq_files)
         ]
         meta = self._make_meta_from_schema()
         return from_delayed(parts, meta=meta)
 
 
 def read_delta_table(
-    path,
-    version=None,
-    columns=None,
-    engine="auto",
-    checkpoint=None,
-    storage_options=None,
-    **kwargs,
+    path, version=None, columns=None, storage_options=None, datetime=None, **kwargs,
 ):
     """
     Read a Delta Table into a Dask DataFrame
@@ -256,31 +168,22 @@ def read_delta_table(
     ----------
     path: str
         path of Delta table directory
-    version: int, default 0
+    version: int, default None
         DeltaTable Version, used for Time Travelling across the
         different versions of the parquet datasets
+    datetime: str, default None
+        Time travel Delta table to the latest version that's created at or
+        before provided `datetime_string` argument.
+        The `datetime_string` argument should be an RFC 3339 and ISO 8601 date
+         and time string.
+
+        Examples:
+        `2018-01-26T18:30:09Z`
+        `2018-12-19T16:39:57-08:00`
+        `2018-01-26T18:30:09.453+00:00`
+         #(copied from delta-rs docs)
     columns: None or list(str)
         Columns to load. If None, loads all.
-    engine : str, default 'auto'
-        Parquet reader library to use. Options include: 'auto', 'fastparquet',
-        'pyarrow', 'pyarrow-dataset', and 'pyarrow-legacy'. Defaults to 'auto',
-        which selects the FastParquetEngine if fastparquet is installed (and
-        ArrowDatasetEngine otherwise).  If 'pyarrow' or 'pyarrow-dataset' is
-        specified, the ArrowDatasetEngine (which leverages the pyarrow.dataset
-        API) will be used. If 'pyarrow-legacy' is specified, ArrowLegacyEngine
-        will be used (which leverages the pyarrow.parquet.ParquetDataset API).
-        NOTE: The 'pyarrow-legacy' option (ArrowLegacyEngine) is deprecated
-        for pyarrow>=5.
-    checkpoint: int, default None
-        DeltaTable protocol aggregates the json delta logs and creates parquet
-        checkpoint for every 10 versions.This will save some IO.
-        for example:
-            if you want to read 106th version of dataset, No need to read all
-            the all the 106 json files (which isIO heavy), instead read 100th
-            parquet checkpoint which contains all the logs of 100 versions in single
-            parquet file and now read the extra 6 json files to match the given
-            106th version.
-            (so IO reduced from 106 to 7)
     storage_options : dict, default None
         Key/value pairs to be passed on to the file-system backend, if any.
     kwargs: dict,optional
@@ -290,9 +193,10 @@ def read_delta_table(
 
         schema : pyarrow.Schema
             Used to maintain schema evolution in deltatable.
-            delta protocol stores the schema string in the json log files which is converted
-             into pyarrow.Schema and used for schema evolution (refer delta/utils.py).
-            i.e Based on particular version, some columns can be shown or not shown.
+            delta protocol stores the schema string in the json log files which is
+            converted into pyarrow.Schema and used for schema evolution
+            i.e Based on particular version, some columns can be
+            shown or not shown.
 
         filter: Union[List[Tuple[str, str, Any]], List[List[Tuple[str, str, Any]]]], default None
             List of filters to apply, like ``[[('col1', '==', 0), ...], ...]``.
@@ -310,16 +214,63 @@ def read_delta_table(
     >>> df = dd.read_delta_table('s3://bucket/my-delta-table')  # doctest: +SKIP
 
     """
-    engine = get_engine(engine)
-    dt = DeltaTable(
+    dtw = DeltaTableWrapper(
         path=path,
         version=version,
-        checkpoint=checkpoint,
         columns=columns,
-        engine=engine,
         storage_options=storage_options,
+        datetime=datetime,
     )
-    # last_checkpoint_version = dt.get_checkpoint_id()
-    dt.get_pq_files_from_checkpoint_parquet()
-    dt.get_pq_files_from_delta_json_logs()
-    return dt.read_delta_table(columns=columns, **kwargs)
+    return dtw.read_delta_table(columns=columns, **kwargs)
+
+
+def read_delta_history(path, limit=None, storage_options=None):
+    """
+    Run the history command on the DeltaTable.
+    The operations are returned in reverse chronological order.
+
+    Parallely reads delta log json files using dask delayed and gathers the
+    list of commit_info (history)
+
+    Parameters
+    ----------
+    path: str
+        path of Delta table directory
+    limit: int, default None
+        the commit info limit to return, defaults to return all history
+
+    Returns
+    -------
+        list of the commit infos registered in the transaction log
+    """
+
+    dtw = DeltaTableWrapper(
+        path=path, version=None, columns=None, storage_options=storage_options
+    )
+    return dtw.history(limit=limit)
+
+
+def vacuum(path, retention_hours=168, dry_run=True, storage_options=None):
+    """
+    Run the Vacuum command on the Delta Table: list and delete
+    files no longer referenced by the Delta table and are
+    older than the retention threshold.
+
+    retention_hours: int, default 168
+    the retention threshold in hours, if none then the value
+    from `configuration.deletedFileRetentionDuration` is used
+    or default of 1 week otherwise.
+    dry_run: bool, default True
+        when activated, list only the files, delete otherwise
+
+    Returns
+    -------
+    None or List of tombstones
+    i.e the list of files no longer referenced by the Delta Table
+    and are older than the retention threshold.
+    """
+
+    dtw = DeltaTableWrapper(
+        path=path, version=None, columns=None, storage_options=storage_options
+    )
+    return dtw.vacuum(retention_hours=retention_hours, dry_run=dry_run)
