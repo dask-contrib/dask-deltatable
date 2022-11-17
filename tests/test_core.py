@@ -254,6 +254,8 @@ def test_catalog(simple_table):
     with patch(
         "deltalake.DeltaTable.from_data_catalog", side_effect=delta_mock
     ) as mock:
+        os.environ["AWS_ACCESS_KEY_ID"] = "apple"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "greatsecret"
         df = ddt.read_delta_table(
             catalog="glue", database_name="stores", table_name="orders"
         )

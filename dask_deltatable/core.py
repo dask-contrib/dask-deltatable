@@ -172,11 +172,14 @@ class DeltaTableWrapper(object):
 def _read_from_catalog(
     database_name: str, table_name: str, **kwargs
 ) -> dd.core.DataFrame:
-    session = Session()
-    credentials = session.get_credentials()
-    current_credentials = credentials.get_frozen_credentials()
-    os.environ["AWS_ACCESS_KEY_ID"] = current_credentials.access_key
-    os.environ["AWS_SECRET_ACCESS_KEY"] = current_credentials.secret_key
+    if ("AWS_ACCESS_KEY_ID" not in os.environ) and (
+        "AWS_SECRET_ACCESS_KEY" not in os.environ
+    ):
+        session = Session()
+        credentials = session.get_credentials()
+        current_credentials = credentials.get_frozen_credentials()
+        os.environ["AWS_ACCESS_KEY_ID"] = current_credentials.access_key
+        os.environ["AWS_SECRET_ACCESS_KEY"] = current_credentials.secret_key
     data_catalog = DataCatalog.AWS
     dt = DeltaTable.from_data_catalog(
         data_catalog=data_catalog, database_name=database_name, table_name=table_name
