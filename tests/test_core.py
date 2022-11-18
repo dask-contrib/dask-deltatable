@@ -3,6 +3,7 @@ import os
 import zipfile
 
 import pytest
+from mock import MagicMock, patch
 
 import dask_deltatable as ddt
 
@@ -81,7 +82,11 @@ def test_read_delta_with_different_versions(simple_table):
 
 def test_row_filter(simple_table):
     # row filter
-    df = ddt.read_delta_table(simple_table, version=0, filter=[("count", ">", 30)],)
+    df = ddt.read_delta_table(
+        simple_table,
+        version=0,
+        filter=[("count", ">", 30)],
+    )
     assert df.compute().shape == (61, 3)
 
 
@@ -219,3 +224,39 @@ def test_vacuum(vacuum_table):
     tombstones = ddt.vacuum(vacuum_table, dry_run=False)
     after_pq_files_len = len(glob.glob(f"{vacuum_table}/*.parquet"))
     assert after_pq_files_len == 3
+
+
+def test_read_delta_with_error():
+    with pytest.raises(ValueError) as exc_info:
+        ddt.read_delta_table()
+    assert str(exc_info.value) == "Please Provide Delta Table path"
+
+
+def test_catalog_with_error():
+    with pytest.raises(ValueError) as exc_info:
+        ddt.read_delta_table(catalog="glue")
+    assert (
+        str(exc_info.value)
+        == "Since Catalog was provided, please provide Database and table name"
+    )
+
+
+def test_catalog(simple_table):
+    dt = MagicMock()
+
+    def delta_mock(**kwargs):
+        from deltalake import DeltaTable
+
+        files = glob.glob(simple_table + "/*parquet")
+        dt.file_uris = MagicMock(return_value=files)
+        return dt
+
+    with patch(
+        "deltalake.DeltaTable.from_data_catalog", side_effect=delta_mock
+    ) as mock:
+        os.environ["AWS_ACCESS_KEY_ID"] = "apple"
+        os.environ["AWS_SECRET_ACCESS_KEY"] = "greatsecret"
+        df = ddt.read_delta_table(
+            catalog="glue", database_name="stores", table_name="orders"
+        )
+        assert df.compute().shape == (200, 3)

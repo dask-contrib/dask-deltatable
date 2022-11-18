@@ -6,3 +6,5 @@ dependencies:
   - dask[dataframe,distributed]
   - pyarrow
   - pytest
+  - pytest-cov
+  - mock

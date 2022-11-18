@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="dask-deltatable",
-    version="0.2",
+    version="0.3rc",
     description="Dask + Delta Table ",
     maintainer="rajagurunath",
     maintainer_email="gurunathrajagopal@gmail.com",
@@ -18,6 +18,7 @@ setup(
     python_requires=">=3.7",
     install_requires=open("requirements.txt").read().strip().split("\n"),
     extras_require={"dev": ["pytest", "requests", "pytest-cov>=2.10.1"]},
+    package_data={"dask_deltatable": ["*.pyi" "__init__.pyi", "core.pyi"]},
     include_package_data=True,
     zip_safe=False,
 )

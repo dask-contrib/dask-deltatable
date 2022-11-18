@@ -49,4 +49,10 @@ ddt.vacuum("delta_path",dry_run=False)
 ddt.read_delta_table("s3://bucket_name/delta_path",version=3)
 # please ensure the credentials are properly configured as environment variable or
 # configured as in ~/.aws/credential
+
+# can connect with AWS Glue catalog and read the complete delta table (currently only AWS catalog available)
+# will take expilicit AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from environment
+# variables if available otherwise fallback to ~/.aws/credential
+ddt.read_delta_table(catalog=glue,database_name="science",table_name="physics")
+
 ```
