@@ -17,7 +17,10 @@ setup(
     long_description_content_type="text/markdown",
     python_requires=">=3.7",
     install_requires=open("requirements.txt").read().strip().split("\n"),
-    extras_require={"dev": ["pytest", "requests", "pytest-cov>=2.10.1"]},
+    extras_require={
+        "dev": ["pytest", "requests", "pytest-cov>=2.10.1"],
+        "s3": ["s3fs", "boto3"],
+    },
     package_data={"dask_deltatable": ["*.pyi" "__init__.pyi", "core.pyi"]},
     include_package_data=True,
     zip_safe=False,
