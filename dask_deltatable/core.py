@@ -29,13 +29,18 @@ class DeltaTableWrapper(object):
         columns: List[str],
         datetime: Optional[str] = None,
         storage_options: Dict[str, str] = None,
+        delta_storage_options: Dict[str, str] = None,
     ) -> None:
         self.path: str = path
         self.version: int = version
         self.columns = columns
         self.datetime = datetime
         self.storage_options = storage_options
-        self.dt = DeltaTable(table_uri=self.path, version=self.version)
+        self.dt = DeltaTable(
+            table_uri=self.path,
+            version=self.version,
+            storage_options=delta_storage_options,
+        )
         self.fs, self.fs_token, _ = get_fs_token_paths(
             path, storage_options=storage_options
         )
@@ -198,6 +203,7 @@ def read_delta_table(
     columns: List[str] = None,
     storage_options: Dict[str, str] = None,
     datetime: str = None,
+    delta_storage_options: Dict[str, str] = None,
     **kwargs,
 ):
     """
@@ -235,7 +241,9 @@ def read_delta_table(
     columns: None or list(str)
         Columns to load. If None, loads all.
     storage_options : dict, default None
-        Key/value pairs to be passed on to the file-system backend, if any.
+        Key/value pairs to be passed on to the fsspec backend, if any.
+    delta_storage_options : dict, default None
+        Key/value pairs to be passed on to the delta-rs filesystem, if any.
     kwargs: dict,optional
         Some most used parameters can be passed here are:
         1. schema
@@ -282,13 +290,17 @@ def read_delta_table(
             columns=columns,
             storage_options=storage_options,
             datetime=datetime,
+            delta_storage_options=delta_storage_options,
         )
         resultdf = dtw.read_delta_table(columns=columns, **kwargs)
     return resultdf
 
 
 def read_delta_history(
-    path: str, limit: Optional[int] = None, storage_options: Dict[str, str] = None
+    path: str,
+    limit: Optional[int] = None,
+    storage_options: Dict[str, str] = None,
+    delta_storage_options: Dict[str, str] = None,
 ) -> dd.core.DataFrame:
     """
     Run the history command on the DeltaTable.
@@ -310,7 +322,11 @@ def read_delta_history(
     """
 
     dtw = DeltaTableWrapper(
-        path=path, version=None, columns=None, storage_options=storage_options
+        path=path,
+        version=None,
+        columns=None,
+        storage_options=storage_options,
+        delta_storage_options=delta_storage_options,
     )
     return dtw.history(limit=limit)
 
@@ -320,6 +336,7 @@ def vacuum(
     retention_hours: int = 168,
     dry_run: bool = True,
     storage_options: Dict[str, str] = None,
+    delta_storage_options: Dict[str, str] = None,
 ) -> None:
     """
     Run the Vacuum command on the Delta Table: list and delete
@@ -341,6 +358,10 @@ def vacuum(
     """
 
     dtw = DeltaTableWrapper(
-        path=path, version=None, columns=None, storage_options=storage_options
+        path=path,
+        version=None,
+        columns=None,
+        storage_options=storage_options,
+        delta_storage_options=delta_storage_options,
     )
     return dtw.vacuum(retention_hours=retention_hours, dry_run=dry_run)
