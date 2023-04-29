@@ -350,6 +350,6 @@ def vacuum(
 
     dtw = DeltaTableWrapper(
         path=path, version=None, columns=None, storage_options=storage_options,
-        delta_storage_options=delta_storage_optoins,
+        delta_storage_options=delta_storage_options,
     )
     return dtw.vacuum(retention_hours=retention_hours, dry_run=dry_run)
