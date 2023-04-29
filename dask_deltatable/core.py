@@ -36,7 +36,11 @@ class DeltaTableWrapper(object):
         self.columns = columns
         self.datetime = datetime
         self.storage_options = storage_options
-        self.dt = DeltaTable(table_uri=self.path, version=self.version, storage_options=delta_storage_options)
+        self.dt = DeltaTable(
+            table_uri=self.path,
+            version=self.version,
+            storage_options=delta_storage_options,
+        )
         self.fs, self.fs_token, _ = get_fs_token_paths(
             path, storage_options=storage_options
         )
@@ -293,7 +297,9 @@ def read_delta_table(
 
 
 def read_delta_history(
-    path: str, limit: Optional[int] = None, storage_options: Dict[str, str] = None,
+    path: str,
+    limit: Optional[int] = None,
+    storage_options: Dict[str, str] = None,
     delta_storage_options: Dict[str, str] = None,
 ) -> dd.core.DataFrame:
     """
@@ -316,7 +322,10 @@ def read_delta_history(
     """
 
     dtw = DeltaTableWrapper(
-        path=path, version=None, columns=None, storage_options=storage_options,
+        path=path,
+        version=None,
+        columns=None,
+        storage_options=storage_options,
         delta_storage_options=delta_storage_options,
     )
     return dtw.history(limit=limit)
@@ -349,7 +358,10 @@ def vacuum(
     """
 
     dtw = DeltaTableWrapper(
-        path=path, version=None, columns=None, storage_options=storage_options,
+        path=path,
+        version=None,
+        columns=None,
+        storage_options=storage_options,
         delta_storage_options=delta_storage_options,
     )
     return dtw.vacuum(retention_hours=retention_hours, dry_run=dry_run)
