@@ -6,7 +6,6 @@ from urllib.parse import urlparse
 import dask
 import dask.dataframe as dd
 import pyarrow.parquet as pq
-from boto3 import Session
 from dask.base import tokenize
 from dask.dataframe.io import from_delayed
 from dask.delayed import delayed
@@ -171,7 +170,8 @@ class DeltaTableWrapper(object):
             for f in list(pq_files)
         ]
         meta = self._make_meta_from_schema()
-        return from_delayed(parts, meta=meta)
+        verify_meta = kwargs.get("verify_meta", False)
+        return from_delayed(parts, meta=meta, verify_meta=verify_meta)
 
 
 def _read_from_catalog(
@@ -180,6 +180,9 @@ def _read_from_catalog(
     if ("AWS_ACCESS_KEY_ID" not in os.environ) and (
         "AWS_SECRET_ACCESS_KEY" not in os.environ
     ):
+        # defer's installing boto3 upfront !
+        from boto3 import Session
+
         session = Session()
         credentials = session.get_credentials()
         current_credentials = credentials.get_frozen_credentials()
