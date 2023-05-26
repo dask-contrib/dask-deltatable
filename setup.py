@@ -11,7 +11,7 @@ setup(
     description="Dask + Delta Table ",
     maintainer="rajagurunath",
     maintainer_email="gurunathrajagopal@gmail.com",
-    license="MIT",
+    license="BSD-3-Clause",
     packages=["dask_deltatable"],
     long_description=long_description,
     long_description_content_type="text/markdown",
