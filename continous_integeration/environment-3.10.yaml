@@ -1,0 +1,10 @@
+name: test-environment
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - dask[dataframe,distributed]
+  - pyarrow
+  - pytest
+  - pytest-cov
+  - mock
