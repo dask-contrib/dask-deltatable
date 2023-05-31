@@ -43,13 +43,14 @@ class DeltaTableWrapper(object):
         self.fs, self.fs_token, _ = get_fs_token_paths(
             path, storage_options=storage_options
         )
-        self.schema = self.dt.pyarrow_schema()
+        self.schema = self.dt.schema().to_pyarrow()
 
     def read_delta_dataset(self, f: str, **kwargs: Dict[any, any]):
         schema = kwargs.pop("schema", None) or self.schema
         filter = kwargs.pop("filter", None)
         if filter:
-            filter_expression = pq._filters_to_expression(filter)
+            filter_converter = getattr(pq, "filters_to_expression", getattr(pq, "_filters_to_expression"))
+            filter_expression = filter_converter(filter)
         else:
             filter_expression = None
         return (
@@ -65,15 +66,10 @@ class DeltaTableWrapper(object):
         )
 
     def _make_meta_from_schema(self) -> Dict[str, str]:
-        meta = dict()
-
-        for field in self.schema:
-            if self.columns:
-                if field.name in self.columns:
-                    meta[field.name] = field.type.to_pandas_dtype()
-            else:
-                meta[field.name] = field.type.to_pandas_dtype()
-        return meta
+        meta = self.schema.empty_table().to_pandas()
+        if self.columns:
+            meta = meta[self.columns]
+        return meta.dtypes.to_dict()
 
     def _history_helper(self, log_file_name: str):
         log = self.fs.cat(log_file_name).decode().split("\n")
@@ -142,7 +138,7 @@ class DeltaTableWrapper(object):
                 )(f)
                 for f in tombstones
             ]
-        dask.compute(parts)[0]
+        return dask.compute(parts)[0]
 
     def get_pq_files(self) -> List[str]:
         """
