@@ -49,10 +49,11 @@ class DeltaTableWrapper(object):
         schema = kwargs.pop("schema", None) or self.schema
         filter = kwargs.pop("filter", None)
         if filter:
-            filter_converter = getattr(
-                pq, "filters_to_expression", getattr(pq, "_filters_to_expression")
-            )
-            filter_expression = filter_converter(filter)
+            try:
+                filter_expression = pq.filters_to_expression(filter)
+            except AttributeError:
+                # fallback to older internal method
+                filter_expression = pq._filters_to_expression(filter)
         else:
             filter_expression = None
         return (
