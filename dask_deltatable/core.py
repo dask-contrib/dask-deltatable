@@ -1,5 +1,6 @@
 import json
 import os
+from functools import partial
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
@@ -7,8 +8,11 @@ import dask
 import dask.dataframe as dd
 import pyarrow.parquet as pq
 from dask.base import tokenize
-from dask.dataframe.io import from_delayed
+from dask.dataframe.core import new_dd_object
+from dask.dataframe.utils import make_meta
 from dask.delayed import delayed
+from dask.highlevelgraph import HighLevelGraph
+from dask.layers import DataFrameIOLayer
 from deltalake import DataCatalog, DeltaTable
 from fsspec.core import get_fs_token_paths
 from pyarrow import dataset as pa_ds
@@ -44,6 +48,10 @@ class DeltaTableWrapper(object):
             path, storage_options=storage_options
         )
         self.schema = self.dt.schema().to_pyarrow()
+        meta = make_meta(self.schema.empty_table().to_pandas())
+        if self.columns:
+            meta = meta[self.columns]
+        self.meta = meta
 
     def read_delta_dataset(self, f: str, **kwargs: Dict[any, any]):
         schema = kwargs.pop("schema", None) or self.schema
@@ -67,12 +75,6 @@ class DeltaTableWrapper(object):
             .to_table(filter=filter_expression, columns=self.columns)
             .to_pandas()
         )
-
-    def _make_meta_from_schema(self) -> Dict[str, str]:
-        meta = self.schema.empty_table().to_pandas()
-        if self.columns:
-            meta = meta[self.columns]
-        return meta.dtypes.to_dict()
 
     def _history_helper(self, log_file_name: str):
         log = self.fs.cat(log_file_name).decode().split("\n")
@@ -161,16 +163,20 @@ class DeltaTableWrapper(object):
         pq_files = self.get_pq_files()
         if len(pq_files) == 0:
             raise RuntimeError("No Parquet files are available")
-        parts = [
-            delayed(
-                self.read_delta_dataset,
-                name="read-delta-table-" + tokenize(self.fs_token, f, **kwargs),
-            )(f, **kwargs)
-            for f in list(pq_files)
-        ]
-        meta = self._make_meta_from_schema()
-        verify_meta = kwargs.get("verify_meta", False)
-        return from_delayed(parts, meta=meta, verify_meta=verify_meta)
+
+        # Create Blockwise layer
+        label = "read-delta-table-"
+        output_name = f"{label}{tokenize(self.fs_token, **kwargs)}"
+        layer = DataFrameIOLayer(
+            output_name,
+            self.meta.columns,
+            pq_files,
+            partial(self.read_delta_dataset, **kwargs),
+            label=label,
+        )
+        divisions = tuple([None] * (len(pq_files) + 1))
+        graph = HighLevelGraph({output_name: layer}, {output_name: set()})
+        return new_dd_object(graph, output_name, self.meta, divisions)
 
 
 def _read_from_catalog(
