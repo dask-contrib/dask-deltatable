@@ -161,13 +161,12 @@ class DeltaTableWrapper(object):
         if len(pq_files) == 0:
             raise RuntimeError("No Parquet files are available")
 
-        label = "read-delta-table-"
         return dd.from_map(
             partial(self.read_delta_dataset, **kwargs),
             pq_files,
             meta=self.meta,
-            label=label,
-            token=f"{label}{tokenize(self.fs_token, **kwargs)}",
+            label="read-delta-table",
+            token=tokenize(self.fs_token, **kwargs),
         )
 
 
