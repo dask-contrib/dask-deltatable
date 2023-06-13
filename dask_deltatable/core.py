@@ -8,11 +8,8 @@ import dask
 import dask.dataframe as dd
 import pyarrow.parquet as pq
 from dask.base import tokenize
-from dask.dataframe.core import new_dd_object
 from dask.dataframe.utils import make_meta
 from dask.delayed import delayed
-from dask.highlevelgraph import HighLevelGraph
-from dask.layers import DataFrameIOLayer
 from deltalake import DataCatalog, DeltaTable
 from fsspec.core import get_fs_token_paths
 from pyarrow import dataset as pa_ds
@@ -164,19 +161,14 @@ class DeltaTableWrapper(object):
         if len(pq_files) == 0:
             raise RuntimeError("No Parquet files are available")
 
-        # Create Blockwise layer
         label = "read-delta-table-"
-        output_name = f"{label}{tokenize(self.fs_token, **kwargs)}"
-        layer = DataFrameIOLayer(
-            output_name,
-            self.meta.columns,
-            pq_files,
+        return dd.from_map(
             partial(self.read_delta_dataset, **kwargs),
+            pq_files,
+            meta=self.meta,
             label=label,
+            token=f"{label}{tokenize(self.fs_token, **kwargs)}",
         )
-        divisions = tuple([None] * (len(pq_files) + 1))
-        graph = HighLevelGraph({output_name: layer}, {output_name: set()})
-        return new_dd_object(graph, output_name, self.meta, divisions)
 
 
 def _read_from_catalog(
