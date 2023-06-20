@@ -1,9 +1,9 @@
 import glob
 import os
 import zipfile
+from unittest.mock import MagicMock, patch
 
 import pytest
-from mock import MagicMock, patch
 
 import dask_deltatable as ddt
 

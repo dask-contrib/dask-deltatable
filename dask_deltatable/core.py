@@ -14,7 +14,7 @@ from fsspec.core import get_fs_token_paths
 from pyarrow import dataset as pa_ds
 
 
-class DeltaTableWrapper(object):
+class DeltaTableWrapper:
     path: str
     version: int
     columns: List[str]
