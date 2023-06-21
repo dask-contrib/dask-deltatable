@@ -16,16 +16,16 @@ from pyarrow import dataset as pa_ds
 
 class DeltaTableWrapper:
     path: str
-    version: int
-    columns: List[str]
-    datetime: str
-    storage_options: Dict[str, Any]
+    version: Optional[int]
+    columns: Optional[List[str]]
+    datetime: Optional[str]
+    storage_options: Optional[Dict[str, Any]]
 
     def __init__(
         self,
         path: str,
-        version: int,
-        columns: List[str],
+        version: Optional[int],
+        columns: Optional[List[str]],
         datetime: Optional[str] = None,
         storage_options: Optional[Dict[str, str]] = None,
         delta_storage_options: Optional[Dict[str, str]] = None,
@@ -112,7 +112,7 @@ class DeltaTableWrapper:
             )
         self.fs.rm_file(self.path + "/" + filename_to_delete)
 
-    def vacuum(self, retention_hours: int = 168, dry_run: bool = True) -> None:
+    def vacuum(self, retention_hours: int = 168, dry_run: bool = True) -> list[str]:
         """
         Run the Vacuum command on the Delta Table: list and delete files no
         longer referenced by the Delta table and are older than the
@@ -170,7 +170,7 @@ class DeltaTableWrapper:
         ]
         meta = self._make_meta_from_schema()
         verify_meta = kwargs.get("verify_meta", False)
-        return from_delayed(parts, meta=meta, verify_meta=verify_meta)
+        return from_delayed(parts, meta=meta, verify_meta=verify_meta)  # type: ignore[return-value]
 
 
 def _read_from_catalog(
@@ -339,7 +339,7 @@ def vacuum(
     dry_run: bool = True,
     storage_options: Optional[Dict[str, str]] = None,
     delta_storage_options: Optional[Dict[str, str]] = None,
-) -> None:
+) -> list[str]:
     """
     Run the Vacuum command on the Delta Table: list and delete
     files no longer referenced by the Delta table and are
@@ -354,7 +354,7 @@ def vacuum(
 
     Returns
     -------
-    None or List of tombstones
+    List of tombstones
     i.e the list of files no longer referenced by the Delta Table
     and are older than the retention threshold.
     """
