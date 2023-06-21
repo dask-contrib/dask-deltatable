@@ -21,7 +21,6 @@ setup(
         "dev": ["pytest", "requests", "pytest-cov>=2.10.1"],
         "s3": ["s3fs", "boto3"],
     },
-    package_data={"dask_deltatable": ["*.pyi" "__init__.pyi", "core.pyi"]},
     include_package_data=True,
     zip_safe=False,
 )

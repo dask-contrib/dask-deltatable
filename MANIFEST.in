@@ -1,0 +1,2 @@
+include requirements.txt
+include dask_deltatable/py.typed
