@@ -5,12 +5,12 @@ from urllib.parse import urlparse
 
 import dask
 import dask.dataframe as dd
-import pyarrow.parquet as pq
+import pyarrow.parquet as pq  # type: ignore[import]
 from dask.base import tokenize
 from dask.dataframe.io import from_delayed
 from dask.delayed import delayed
 from deltalake import DataCatalog, DeltaTable
-from fsspec.core import get_fs_token_paths
+from fsspec.core import get_fs_token_paths  # type: ignore[import]
 from pyarrow import dataset as pa_ds
 
 
