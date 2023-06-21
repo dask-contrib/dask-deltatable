@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import annotations
+
 from setuptools import setup
 
 with open("README.md", encoding="utf-8") as f:
