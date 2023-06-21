@@ -112,7 +112,7 @@ class DeltaTableWrapper:
             )
         self.fs.rm_file(self.path + "/" + filename_to_delete)
 
-    def vacuum(self, retention_hours: int = 168, dry_run: bool = True) -> list[str]:
+    def vacuum(self, retention_hours: int = 168, dry_run: bool = True) -> List[str]:
         """
         Run the Vacuum command on the Delta Table: list and delete files no
         longer referenced by the Delta table and are older than the
@@ -339,7 +339,7 @@ def vacuum(
     dry_run: bool = True,
     storage_options: Optional[Dict[str, str]] = None,
     delta_storage_options: Optional[Dict[str, str]] = None,
-) -> list[str]:
+) -> List[str]:
     """
     Run the Vacuum command on the Delta Table: list and delete
     files no longer referenced by the Delta table and are
