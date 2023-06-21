@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 import dask
@@ -19,7 +19,7 @@ class DeltaTableWrapper:
     version: int
     columns: List[str]
     datetime: str
-    storage_options: Dict[str, any]
+    storage_options: Dict[str, Any]
 
     def __init__(
         self,
@@ -45,7 +45,7 @@ class DeltaTableWrapper:
         )
         self.schema = self.dt.schema().to_pyarrow()
 
-    def read_delta_dataset(self, f: str, **kwargs: Dict[any, any]):
+    def read_delta_dataset(self, f: str, **kwargs: Dict[Any, Any]):
         schema = kwargs.pop("schema", None) or self.schema
         filter = kwargs.pop("filter", None)
         if filter:
