@@ -27,8 +27,8 @@ class DeltaTableWrapper:
         version: int,
         columns: List[str],
         datetime: Optional[str] = None,
-        storage_options: Dict[str, str] = None,
-        delta_storage_options: Dict[str, str] = None,
+        storage_options: Optional[Dict[str, str]] = None,
+        delta_storage_options: Optional[Dict[str, str]] = None,
     ) -> None:
         self.path: str = path
         self.version: int = version
@@ -199,13 +199,13 @@ def _read_from_catalog(
 def read_delta_table(
     path: Optional[str] = None,
     catalog: Optional[str] = None,
-    database_name: str = None,
-    table_name: str = None,
-    version: int = None,
-    columns: List[str] = None,
-    storage_options: Dict[str, str] = None,
-    datetime: str = None,
-    delta_storage_options: Dict[str, str] = None,
+    database_name: Optional[str] = None,
+    table_name: Optional[str] = None,
+    version: Optional[int] = None,
+    columns: Optional[List[str]] = None,
+    storage_options: Optional[Dict[str, str]] = None,
+    datetime: Optional[str] = None,
+    delta_storage_options: Optional[Dict[str, str]] = None,
     **kwargs,
 ):
     """
@@ -301,8 +301,8 @@ def read_delta_table(
 def read_delta_history(
     path: str,
     limit: Optional[int] = None,
-    storage_options: Dict[str, str] = None,
-    delta_storage_options: Dict[str, str] = None,
+    storage_options: Optional[Dict[str, str]] = None,
+    delta_storage_options: Optional[Dict[str, str]] = None,
 ) -> dd.core.DataFrame:
     """
     Run the history command on the DeltaTable.
@@ -337,8 +337,8 @@ def vacuum(
     path: str,
     retention_hours: int = 168,
     dry_run: bool = True,
-    storage_options: Dict[str, str] = None,
-    delta_storage_options: Dict[str, str] = None,
+    storage_options: Optional[Dict[str, str]] = None,
+    delta_storage_options: Optional[Dict[str, str]] = None,
 ) -> None:
     """
     Run the Vacuum command on the Delta Table: list and delete
