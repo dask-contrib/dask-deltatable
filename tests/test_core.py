@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import glob
 import os
 import zipfile
@@ -245,15 +247,11 @@ def test_catalog(simple_table):
     dt = MagicMock()
 
     def delta_mock(**kwargs):
-        from deltalake import DeltaTable
-
         files = glob.glob(simple_table + "/*parquet")
         dt.file_uris = MagicMock(return_value=files)
         return dt
 
-    with patch(
-        "deltalake.DeltaTable.from_data_catalog", side_effect=delta_mock
-    ) as mock:
+    with patch("deltalake.DeltaTable.from_data_catalog", side_effect=delta_mock):
         os.environ["AWS_ACCESS_KEY_ID"] = "apple"
         os.environ["AWS_SECRET_ACCESS_KEY"] = "greatsecret"
         df = ddt.read_delta_table(

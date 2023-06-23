@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import annotations
+
 from setuptools import setup
 
 with open("README.md", encoding="utf-8") as f:
@@ -21,7 +23,6 @@ setup(
         "dev": ["pytest", "requests", "pytest-cov>=2.10.1"],
         "s3": ["s3fs", "boto3"],
     },
-    package_data={"dask_deltatable": ["*.pyi" "__init__.pyi", "core.pyi"]},
     include_package_data=True,
     zip_safe=False,
 )
