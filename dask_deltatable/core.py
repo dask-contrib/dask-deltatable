@@ -1,35 +1,37 @@
+from __future__ import annotations
+
 import json
 import os
 from functools import partial
-from typing import Dict, List, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import dask
 import dask.dataframe as dd
-import pyarrow.parquet as pq
+import pyarrow.parquet as pq  # type: ignore[import]
 from dask.base import tokenize
 from dask.dataframe.utils import make_meta
 from dask.delayed import delayed
 from deltalake import DataCatalog, DeltaTable
-from fsspec.core import get_fs_token_paths
+from fsspec.core import get_fs_token_paths  # type: ignore[import]
 from pyarrow import dataset as pa_ds
 
 
-class DeltaTableWrapper(object):
+class DeltaTableWrapper:
     path: str
-    version: int
-    columns: List[str]
-    datetime: str
-    storage_options: Dict[str, any]
+    version: int | None
+    columns: list[str] | None
+    datetime: str | None
+    storage_options: dict[str, Any] | None
 
     def __init__(
         self,
         path: str,
-        version: int,
-        columns: List[str],
-        datetime: Optional[str] = None,
-        storage_options: Dict[str, str] = None,
-        delta_storage_options: Dict[str, str] = None,
+        version: int | None,
+        columns: list[str] | None,
+        datetime: str | None = None,
+        storage_options: dict[str, str] | None = None,
+        delta_storage_options: dict[str, str] | None = None,
     ) -> None:
         self.path: str = path
         self.version: int = version
@@ -50,7 +52,7 @@ class DeltaTableWrapper(object):
             meta = meta[self.columns]
         self.meta = meta
 
-    def read_delta_dataset(self, f: str, **kwargs: Dict[any, any]):
+    def read_delta_dataset(self, f: str, **kwargs: dict[Any, Any]):
         schema = kwargs.pop("schema", None) or self.schema
         filter = kwargs.pop("filter", None)
         if filter:
@@ -81,7 +83,7 @@ class DeltaTableWrapper(object):
                 if "commitInfo" in meta_data:
                     return meta_data["commitInfo"]
 
-    def history(self, limit: Optional[int] = None, **kwargs) -> dd.core.DataFrame:
+    def history(self, limit: int | None = None, **kwargs) -> dd.core.DataFrame:
         delta_log_path = str(self.path).rstrip("/") + "/_delta_log"
         log_files = self.fs.glob(f"{delta_log_path}/*.json")
         if len(log_files) == 0:  # pragma no cover
@@ -111,7 +113,7 @@ class DeltaTableWrapper(object):
             )
         self.fs.rm_file(self.path + "/" + filename_to_delete)
 
-    def vacuum(self, retention_hours: int = 168, dry_run: bool = True) -> None:
+    def vacuum(self, retention_hours: int = 168, dry_run: bool = True) -> list[str]:
         """
         Run the Vacuum command on the Delta Table: list and delete files no
         longer referenced by the Delta table and are older than the
@@ -142,7 +144,7 @@ class DeltaTableWrapper(object):
             ]
         return dask.compute(parts)[0]
 
-    def get_pq_files(self) -> List[str]:
+    def get_pq_files(self) -> list[str]:
         """
         get the list of parquet files after loading the
         current datetime version
@@ -194,15 +196,15 @@ def _read_from_catalog(
 
 
 def read_delta_table(
-    path: Optional[str] = None,
-    catalog: Optional[str] = None,
-    database_name: str = None,
-    table_name: str = None,
-    version: int = None,
-    columns: List[str] = None,
-    storage_options: Dict[str, str] = None,
-    datetime: str = None,
-    delta_storage_options: Dict[str, str] = None,
+    path: str | None = None,
+    catalog: str | None = None,
+    database_name: str | None = None,
+    table_name: str | None = None,
+    version: int | None = None,
+    columns: list[str] | None = None,
+    storage_options: dict[str, str] | None = None,
+    datetime: str | None = None,
+    delta_storage_options: dict[str, str] | None = None,
     **kwargs,
 ):
     """
@@ -297,9 +299,9 @@ def read_delta_table(
 
 def read_delta_history(
     path: str,
-    limit: Optional[int] = None,
-    storage_options: Dict[str, str] = None,
-    delta_storage_options: Dict[str, str] = None,
+    limit: int | None = None,
+    storage_options: dict[str, str] | None = None,
+    delta_storage_options: dict[str, str] | None = None,
 ) -> dd.core.DataFrame:
     """
     Run the history command on the DeltaTable.
@@ -334,9 +336,9 @@ def vacuum(
     path: str,
     retention_hours: int = 168,
     dry_run: bool = True,
-    storage_options: Dict[str, str] = None,
-    delta_storage_options: Dict[str, str] = None,
-) -> None:
+    storage_options: dict[str, str] | None = None,
+    delta_storage_options: dict[str, str] | None = None,
+) -> list[str]:
     """
     Run the Vacuum command on the Delta Table: list and delete
     files no longer referenced by the Delta table and are
@@ -351,7 +353,7 @@ def vacuum(
 
     Returns
     -------
-    None or List of tombstones
+    List of tombstones
     i.e the list of files no longer referenced by the Delta Table
     and are older than the retention threshold.
     """

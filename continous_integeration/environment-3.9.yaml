@@ -7,4 +7,3 @@ dependencies:
   - pyarrow
   - pytest
   - pytest-cov
-  - mock
