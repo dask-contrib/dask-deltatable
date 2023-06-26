@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from functools import partial
 from typing import Any
 from urllib.parse import urlparse
 
@@ -9,7 +10,7 @@ import dask
 import dask.dataframe as dd
 import pyarrow.parquet as pq  # type: ignore[import]
 from dask.base import tokenize
-from dask.dataframe.io import from_delayed
+from dask.dataframe.utils import make_meta
 from dask.delayed import delayed
 from deltalake import DataCatalog, DeltaTable
 from fsspec.core import get_fs_token_paths  # type: ignore[import]
@@ -46,6 +47,10 @@ class DeltaTableWrapper:
             path, storage_options=storage_options
         )
         self.schema = self.dt.schema().to_pyarrow()
+        meta = make_meta(self.schema.empty_table().to_pandas())
+        if self.columns:
+            meta = meta[self.columns]
+        self.meta = meta
 
     def read_delta_dataset(self, f: str, **kwargs: dict[Any, Any]):
         schema = kwargs.pop("schema", None) or self.schema
@@ -69,12 +74,6 @@ class DeltaTableWrapper:
             .to_table(filter=filter_expression, columns=self.columns)
             .to_pandas()
         )
-
-    def _make_meta_from_schema(self) -> dict[str, str]:
-        meta = self.schema.empty_table().to_pandas()
-        if self.columns:
-            meta = meta[self.columns]
-        return meta.dtypes.to_dict()
 
     def _history_helper(self, log_file_name: str):
         log = self.fs.cat(log_file_name).decode().split("\n")
@@ -163,16 +162,14 @@ class DeltaTableWrapper:
         pq_files = self.get_pq_files()
         if len(pq_files) == 0:
             raise RuntimeError("No Parquet files are available")
-        parts = [
-            delayed(
-                self.read_delta_dataset,
-                name="read-delta-table-" + tokenize(self.fs_token, f, **kwargs),
-            )(f, **kwargs)
-            for f in list(pq_files)
-        ]
-        meta = self._make_meta_from_schema()
-        verify_meta = kwargs.get("verify_meta", False)
-        return from_delayed(parts, meta=meta, verify_meta=verify_meta)  # type: ignore[return-value]
+
+        return dd.from_map(
+            partial(self.read_delta_dataset, **kwargs),
+            pq_files,
+            meta=self.meta,
+            label="read-delta-table",
+            token=tokenize(self.fs_token, **kwargs),
+        )
 
 
 def _read_from_catalog(
