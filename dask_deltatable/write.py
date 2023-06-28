@@ -1,36 +1,39 @@
 from __future__ import annotations
 
 import json
-from deltalake import  DeltaTable
-from typing import Any, Literal, Mapping
+import uuid
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Literal, Mapping
+
+import dask.dataframe as dd
 import pyarrow as pa
 import pyarrow.dataset as ds
-import dask.dataframe as dd
 import pyarrow.fs as pa_fs
-from dask.highlevelgraph import HighLevelGraph
+from dask.core import flatten
 from dask.dataframe.core import Scalar
+from dask.highlevelgraph import HighLevelGraph
+from deltalake import DeltaTable
 from deltalake.writer import (
-    try_get_table_and_table_uri,
-    __enforce_append_only,
     MAX_SUPPORTED_WRITER_VERSION,
-    DeltaStorageHandler,
-    DeltaProtocolError,
-    get_partitions_from_path,
     PYARROW_MAJOR_VERSION,
-    get_file_stats_from_metadata,
     AddAction,
     DeltaJSONEncoder,
+    DeltaProtocolError,
+    DeltaStorageHandler,
+    __enforce_append_only,
     _write_new_deltalake,
+    get_file_stats_from_metadata,
+    get_partitions_from_path,
+    try_get_table_and_table_uri,
 )
-from datetime import datetime
-
-import uuid
 from pyarrow.lib import RecordBatchReader
-from dask.core import flatten
+from toolz.itertoolz import pluck
+
+from ._schema import validate_compatible
 
 
-def write_deltalake(
+def to_deltalake(
     table_or_uri: str | Path | DeltaTable,
     df: dd.DataFrame,
     *,
@@ -51,6 +54,10 @@ def write_deltalake(
     storage_options: dict[str, str] | None = None,
     partition_filters: list[tuple[str, str, Any]] | None = None,
 ):
+    """Write a given dask.DataFrame to a delta table
+
+    TODO:
+    """
     table, table_uri = try_get_table_and_table_uri(table_or_uri, storage_options)
 
     # We need to write against the latest table version
@@ -99,10 +106,13 @@ def write_deltalake(
     else:  # creating a new table
         current_version = -1
 
-    if partition_by:
+    # FIXME: schema is only known at this point if provided by the user
+    if partition_by and schema:
         partition_schema = pa.schema([schema.field(name) for name in partition_by])
         partitioning = ds.partitioning(partition_schema, flavor="hive")
     else:
+        if partition_by:
+            raise NotImplementedError("Have to provide schema when using partition_by")
         partitioning = None
     if mode == "overwrite":
         # FIXME: There are a couple of checks that are not migrated yet
@@ -120,6 +130,7 @@ def write_deltalake(
         max_rows_per_group=max_rows_per_group,
         filesystem=filesystem,
         max_partitions=max_partitions,
+        meta=(None, object),
     )
     final_name = "delta-commit"
     dsk = {
@@ -144,7 +155,7 @@ def write_deltalake(
 
 def _commit(
     table,
-    add_actions_nested,
+    schemas_add_actions_nested,
     table_uri,
     schema,
     mode,
@@ -155,7 +166,17 @@ def _commit(
     storage_options,
     partition_filters,
 ):
-    add_actions = flatten(add_actions_nested)
+    schemas = list(flatten(pluck(0, schemas_add_actions_nested)))
+    add_actions = list(flatten(pluck(1, schemas_add_actions_nested)))
+    # TODO: What should the behavior be if the schema is provided? Cast the
+    # data?
+    if schema:
+        schemas.append(schema)
+
+    # TODO: This is applying a potentially stricted schema control than what
+    # Delta requires but if this passes, it should be good to go
+    schema = validate_compatible(schemas)
+    assert schema
     if table is None:
         _write_new_deltalake(
             table_uri,
@@ -192,8 +213,10 @@ def _write_partition(
     max_rows_per_group,
     filesystem,
     max_partitions,
-):
+) -> tuple[pa.Schema, list[AddAction]]:
+    # TODO: what to do with the schema, if provided
     data = pa.Table.from_pandas(df)
+    schema = schema or data.schema
 
     add_actions: list[AddAction] = []
 
@@ -205,7 +228,7 @@ def _write_partition(
         if PYARROW_MAJOR_VERSION >= 9:
             size = written_file.size
         else:
-            size = filesystem.get_file_info([path])[0].size  # type: ignore
+            size = filesystem.get_file_info([path])[0].size
 
         add_actions.append(
             AddAction(
@@ -236,4 +259,4 @@ def _write_partition(
         filesystem=filesystem,
         max_partitions=max_partitions,
     )
-    return add_actions
+    return schema, add_actions
