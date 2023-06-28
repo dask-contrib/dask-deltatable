@@ -1,41 +1,13 @@
 from __future__ import annotations
 
 import os
-import uuid
-from datetime import date
 
-import numpy as np
-import pandas as pd
 import pytest
 from dask.dataframe.utils import assert_eq
 from dask.datasets import timeseries
 
 from dask_deltatable import read_delta_table
 from dask_deltatable.write import to_deltalake
-
-
-def get_dataframe_not_nested():
-    return pd.DataFrame(
-        {
-            "bool": pd.Series([1], dtype=np.bool_),
-            "int8": pd.Series([1], dtype=np.int8),
-            "int16": pd.Series([1], dtype=np.int16),
-            "int32": pd.Series([1], dtype=np.int32),
-            "int64": pd.Series([1], dtype=np.int64),
-            "uint8": pd.Series([1], dtype=np.uint8),
-            "uint16": pd.Series([1], dtype=np.uint16),
-            "uint32": pd.Series([1], dtype=np.uint32),
-            "uint64": pd.Series([1], dtype=np.uint64),
-            "float32": pd.Series([1.0], dtype=np.float32),
-            "float64": pd.Series([1.0], dtype=np.float64),
-            "date": pd.Series([date(2018, 1, 1)], dtype=object),
-            "datetime64": pd.Series(["2018-01-01"], dtype="datetime64[ns]"),
-            "unicode": pd.Series(["Ö"], dtype=str),
-            "null": pd.Series([None], dtype=object),
-            # Adding a byte type with value as byte sequence which can not be encoded as UTF8
-            "byte": pd.Series([uuid.uuid4().bytes], dtype=object),
-        }
-    ).sort_index(axis=1)
 
 
 @pytest.mark.parametrize(
