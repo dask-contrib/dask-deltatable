@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 
-def get_partition_filters(partition_columns, filters):
+def get_partition_filters(
+    partition_columns: list[str], filters: list[tuple[str, str, Any]] | None
+) -> list[tuple[str, str, Any]] | None:
     """Retrieve only filters on partition columns
 
     Parameters
@@ -16,14 +18,14 @@ def get_partition_filters(partition_columns, filters):
 
     Returns
     -------
-    result : Optional[list[tuple[str, str, Any]]]
+    list[tuple[str, str, Any]] | None
         List of filters, without row filters
     """
     if not filters:
         return None
 
     if isinstance(filters[0][0], str):
-        filters = [filters]
+        filters = cast(list[tuple[str, str, Any]], [filters])
 
     allowed_ops = ["=", "!=", "in", "not in", ">", "<", ">=", "<="]
     partition_filters: dict[str, dict[str, list[Any]]] = {

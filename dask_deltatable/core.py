@@ -159,7 +159,7 @@ class DeltaTableWrapper:
 
         Returns
         -------
-        result : list[str]
+        list[str]
             List of files matching optional filter.
         """
         __doc__ == self.dt.load_with_datetime.__doc__
