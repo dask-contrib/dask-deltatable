@@ -110,11 +110,13 @@ def test_different_schema(simple_table):
 def test_partition_filter(partition_table):
     # partition filter
     df = ddt.read_delta_table(partition_table, version=0, filter=[("col1", "==", 1)])
+    assert df.npartitions == 11
     assert df.compute().shape == (21, 3)
 
     df = ddt.read_delta_table(
         partition_table, filter=[[("col1", "==", 1)], [("col1", "==", 2)]]
     )
+    assert df.npartitions == 21
     assert df.compute().shape == (39, 4)
 
 
