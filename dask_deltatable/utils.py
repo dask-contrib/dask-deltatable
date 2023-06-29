@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, List, Tuple, cast
 
 
 def get_partition_filters(
@@ -10,22 +10,22 @@ def get_partition_filters(
 
     Parameters
     ----------
-    partition_columns : list[str]
+    partition_columns : List[str]
         List of partitioned columns
 
-    filters : list[tuple[str, str, Any]]
+    filters : List[Tuple[str, str, Any]]
         List of filters. Example: [("x", "==", "a")]
 
     Returns
     -------
-    list[tuple[str, str, Any]] | None
+    List[Tuple[str, str, Any]] | None
         List of filters, without row filters
     """
     if not filters:
         return None
 
     if isinstance(filters[0][0], str):
-        filters = cast(list[tuple[str, str, Any]], [filters])
+        filters = cast(List[Tuple[str, str, Any]], [filters])
 
     allowed_ops = ["=", "!=", "in", "not in", ">", "<", ">=", "<="]
     partition_filters: dict[str, dict[str, list[Any]]] = {
