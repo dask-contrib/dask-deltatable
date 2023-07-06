@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 import dask
 import dask.dataframe as dd
-import pyarrow.parquet as pq  # type: ignore[import]
+import pyarrow.parquet as pq
 from dask.base import tokenize
 from dask.dataframe.utils import make_meta
 from dask.delayed import delayed
@@ -16,6 +16,7 @@ from deltalake import DataCatalog, DeltaTable
 from fsspec.core import get_fs_token_paths  # type: ignore[import]
 from pyarrow import dataset as pa_ds
 
+from .types import Filters
 from .utils import get_partition_filters
 
 try:
@@ -145,16 +146,14 @@ class DeltaTableWrapper:
             ]
         return dask.compute(parts)[0]
 
-    def get_pq_files(
-        self, filter: list[tuple[str, str, Any]] | None = None
-    ) -> list[str]:
+    def get_pq_files(self, filter: Filters = None) -> list[str]:
         """
         Get the list of parquet files after loading the
         current datetime version
 
         Parameters
         ----------
-        filter : list[tuple[str, str, Any]] | None
+        filter : list[tuple[str, str, Any]] | list[list[tuple[str, str, Any]]] | None
             Filters in DNF form.
 
         Returns
@@ -168,7 +167,13 @@ class DeltaTableWrapper:
         partition_filters = get_partition_filters(
             self.dt.metadata().partition_columns, filter
         )
-        return self.dt.file_uris(partition_filters=partition_filters)
+        if not partition_filters:
+            # can't filter
+            return self.dt.file_uris()
+        file_uris = set()
+        for filter_set in partition_filters:
+            file_uris.update(self.dt.file_uris(partition_filters=filter_set))
+        return sorted(list(file_uris))
 
     def read_delta_table(self, **kwargs) -> dd.core.DataFrame:
         """

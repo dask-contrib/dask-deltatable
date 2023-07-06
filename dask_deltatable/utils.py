@@ -1,62 +1,64 @@
 from __future__ import annotations
 
-from typing import Any, List, Tuple, cast
+from typing import List, cast
+
+from .types import Filter, Filters
 
 
 def get_partition_filters(
-    partition_columns: list[str], filters: list[tuple[str, str, Any]] | None
-) -> list[tuple[str, str, Any]] | None:
-    """Retrieve only filters on partition columns
+    partition_columns: list[str], filters: Filters
+) -> list[list[Filter]] | None:
+    """Retrieve only filters on partition columns. If there are any row filters in the outer
+    list (the OR list), return None, because we have to search through all partitions to apply
+    row filters
 
     Parameters
     ----------
     partition_columns : List[str]
         List of partitioned columns
 
-    filters : List[Tuple[str, str, Any]]
-        List of filters. Example: [("x", "==", "a")]
+    filters : List[Tuple[str, str, Any]] | List[List[Tuple[str, str, Any]]]
+        List of filters. Examples:
+        1) (x == a) and (y == 3):
+           [("x", "==", "a"), ("y", "==", 3)]
+        2) (x == a) or (y == 3)
+            [[("x", "==", "a")], [("y", "==", 3)]]
 
     Returns
     -------
-    List[Tuple[str, str, Any]] | None
-        List of filters, without row filters
+    List[List[Tuple[str, str, Any]]] | None
+        List of partition filters, None if we can't apply a filter on partitions because
+        row filters are present
     """
-    if not filters:
+    if filters is None or len(filters) == 0:
         return None
 
     if isinstance(filters[0][0], str):
-        filters = cast(List[Tuple[str, str, Any]], [filters])
+        filters = cast(List[List[Filter]], [filters])
 
-    allowed_ops = ["=", "!=", "in", "not in", ">", "<", ">=", "<="]
-    partition_filters: dict[str, dict[str, list[Any]]] = {
-        col: {op: [] for op in allowed_ops} for col in partition_columns
+    allowed_ops = {
+        "=": "=",
+        "==": "=",
+        "!=": "!=",
+        "!==": "!=",
+        "in": "in",
+        "not in": "not in",
+        ">": ">",
+        "<": "<",
+        ">=": ">=",
+        "<=": "<=",
     }
-    for conjunctions in filters:
-        for tpl in conjunctions:
-            if isinstance(tpl, tuple) and tpl[0] in partition_columns:
-                col, op, val = tpl
-                if op in ("=", "=="):
-                    partition_filters[col]["in"].append(val)
-                elif op in ("!=", "!=="):
-                    partition_filters[col]["not in"].append(val)
-                elif op in allowed_ops:
-                    partition_filters[col][op].append(val)
 
-    def compress_opval(col, op, val):
-        if op == "in" and len(val) == 1:
-            return col, "=", val[0]
-        if op == "not in" and len(val) == 1:
-            return col, "!=", val[0]
-        if op in ("<", "<="):
-            return col, op, max(val)
-        if op in (">", ">="):
-            return col, op, min(val)
-        return col, op, val
+    expressions = []
+    for disjunction in filters:
+        inner_expressions = []
+        for col, op, val in disjunction:
+            if col in partition_columns:
+                normalized_op = allowed_ops[op]
+                inner_expressions.append((col, normalized_op, val))
+        if inner_expressions:
+            expressions.append(inner_expressions)
+        else:
+            return None
 
-    compressed_filters = [
-        compress_opval(col, op, val)
-        for col, ops in partition_filters.items()
-        for op, val in ops.items()
-        if len(val) > 0
-    ]
-    return compressed_filters if compressed_filters else None
+    return expressions if expressions else None
