@@ -5,7 +5,7 @@ on: [push, pull_request]
 # When this workflow is queued, automatically cancel any previous running
 # or pending jobs from the same branch
 concurrency:
-  group: ${{ github.ref }}
+  group: tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -15,10 +15,9 @@ jobs:
       run:
         shell: bash -l {0}
     strategy:
-      fail-fast: false
       matrix:
         os: ["windows-latest", "ubuntu-latest", "macos-latest"]
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10", "3.11"]
 
     steps:
       - name: Checkout source
@@ -38,6 +37,9 @@ jobs:
 
       - name: Install dask-deltatable
         run: python -m pip install -e ".[dev]"
+
+      - name: conda list
+        run: conda list
 
       - name: Run tests
         id: run_tests

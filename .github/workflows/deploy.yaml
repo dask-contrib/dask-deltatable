@@ -2,7 +2,7 @@ name: Upload Python Package
 
 on:
   release:
-    types: [created,updated]
+    types: [created, updated]
 
 jobs:
   deploy:
@@ -15,7 +15,7 @@ jobs:
         with:
           miniforge-variant: Mambaforge
           use-mamba: true
-          python-version: 3.8
+          python-version: 3.9
       - name: Install dependencies
         shell: bash -l {0}
         run: |

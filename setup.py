@@ -17,7 +17,7 @@ setup(
     packages=["dask_deltatable"],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     install_requires=open("requirements.txt").read().strip().split("\n"),
     extras_require={
         "dev": ["pytest", "requests", "pytest-cov>=2.10.1"],
