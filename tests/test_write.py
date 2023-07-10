@@ -42,7 +42,7 @@ def test_roundtrip(tmpdir, with_index):
         dtypes=dtypes,
     )
     # FIXME: us is the only precision delta supports. This lib should likely
-    # case this itself
+    # cast this itself
 
     ddf = ddf.reset_index()
     ddf.timestamp = ddf.timestamp.astype("datetime64[us]")

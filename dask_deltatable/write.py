@@ -27,7 +27,6 @@ from deltalake.writer import (
     get_partitions_from_path,
     try_get_table_and_table_uri,
 )
-from pyarrow.lib import RecordBatchReader
 from toolz.itertoolz import pluck
 
 from ._schema import validate_compatible
@@ -101,7 +100,7 @@ def to_deltalake(
             raise DeltaProtocolError(
                 "This table's min_writer_version is "
                 f"{table.protocol().min_writer_version}, "
-                "but this method only supports version 2."
+                f"but this method only supports version {MAX_SUPPORTED_WRITER_VERSION}."
             )
     else:  # creating a new table
         current_version = -1
@@ -116,7 +115,7 @@ def to_deltalake(
         partitioning = None
     if mode == "overwrite":
         # FIXME: There are a couple of checks that are not migrated yet
-        raise NotImplementedError()
+        raise NotImplementedError("mode='overwrite' is not implemented")
 
     written = df.map_partitions(
         _write_partition,
@@ -248,7 +247,7 @@ def _write_partition(
         format="parquet",
         partitioning=partitioning,
         # It will not accept a schema if using a RBR
-        schema=schema if not isinstance(data, RecordBatchReader) else None,
+        schema=schema,
         existing_data_behavior="overwrite_or_ignore",
         file_options=file_options,
         max_open_files=max_open_files,
