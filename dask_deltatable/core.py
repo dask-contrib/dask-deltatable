@@ -8,20 +8,22 @@ from urllib.parse import urlparse
 
 import dask
 import dask.dataframe as dd
+import pyarrow as pa
 import pyarrow.parquet as pq
 from dask.base import tokenize
 from dask.dataframe.utils import make_meta
 from dask.delayed import delayed
 from deltalake import DataCatalog, DeltaTable
 from fsspec.core import get_fs_token_paths
+from packaging.version import Version
 from pyarrow import dataset as pa_ds
 
 from .types import Filters
 from .utils import get_partition_filters
 
-try:
+if Version(pa.__version__) >= Version("10.0.0"):
     filters_to_expression = pq.filters_to_expression
-except AttributeError:
+else:
     # fallback to older internal method
     filters_to_expression = pq._filters_to_expression
 
