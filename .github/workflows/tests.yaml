@@ -40,7 +40,11 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Run tests
-        run: python -m pytest --junitxml=junit/test-results.xml --cov-report=xml tests
+        run: python -m pytest \
+          --junitxml=junit/test-results.xml \
+          --cov-report=xml \
+          --cov dask_deltatable \
+          tests
 
       # - name: Setup tmate session
       #   if: ${{ failure() }}
