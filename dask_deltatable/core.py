@@ -13,7 +13,7 @@ from dask.base import tokenize
 from dask.dataframe.utils import make_meta
 from dask.delayed import delayed
 from deltalake import DataCatalog, DeltaTable
-from fsspec.core import get_fs_token_paths  # type: ignore[import]
+from fsspec.core import get_fs_token_paths
 from pyarrow import dataset as pa_ds
 
 from .types import Filters
