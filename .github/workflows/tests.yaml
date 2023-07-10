@@ -40,21 +40,28 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Run tests
-        run: python -m pytest --junitxml=junit/test-results.xml --cov-report=xml tests
+        id: run_tests
+        run: |
+          set -o pipefail
+          mkdir reports
 
-      # - name: Setup tmate session
-      #   if: ${{ failure() }}
-      #   uses: mxschmitt/action-tmate@v3
+          python -m pytest tests \
+          --junitxml=reports/test-results.xml \
+          --cov-report=xml \
+          --cov dask_deltatable \
+          | tee reports/stdout
 
-      - name: Upload pytest test results
-        uses: actions/upload-artifact@v1
+      - name: Upload test results
+        # ensure this runs even if pytest fails
+        if: >
+          always() &&
+          (steps.run_tests.outcome == 'success' || steps.run_tests.outcome == 'failure')
+        uses: actions/upload-artifact@v3
         with:
-          name: pytest-results
-          path: junit/test-results.xml
-        # Use always() to always run this step to publish test results when there are test failures
-        if: ${{ always() }}
+          path: reports
+
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
