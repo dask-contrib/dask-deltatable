@@ -59,6 +59,30 @@ class SchemaWrapper:
         return hash(_schema2bytes(self.schema))
 
 
+def pyarrow_to_deltalake(schema: pa.Schema) -> pa.Schema:
+    """Adjust data types to make schema compatible with Delta Lake dtypes.
+    Not all Arrow data types are supported by Delta Lake. See also
+    ``deltalake.schema.delta_arrow_schema_from_pandas``.
+
+    Notes
+    -----
+    We shouldn't need this when https://github.com/delta-io/delta-rs/issues/686 is closed
+    """
+    schema_out = []
+    for field in schema:
+        if isinstance(field.type, pa.TimestampType):
+            f = pa.field(
+                name=field.name,
+                type=pa.timestamp("us"),
+                nullable=field.nullable,
+                metadata=field.metadata,
+            )
+            schema_out.append(f)
+        else:
+            schema_out.append(field)
+    return pa.schema(schema_out, metadata=schema.metadata)
+
+
 def _pandas_in_schemas(schemas):
     """Check if any schema contains pandas metadata."""
     has_pandas = False
