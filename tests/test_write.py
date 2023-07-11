@@ -9,7 +9,7 @@ from dask.dataframe.utils import assert_eq
 from dask.datasets import timeseries
 
 from dask_deltatable import read_delta_table
-from dask_deltatable.write import to_deltalake
+from dask_deltatable.write import to_delta_table
 
 
 @pytest.mark.parametrize(
@@ -48,7 +48,7 @@ def test_roundtrip(tmpdir, with_index, freq, partition_freq):
     if with_index:
         ddf = ddf.set_index("timestamp")
 
-    out = to_deltalake(tmpdir, ddf)
+    out = to_delta_table(tmpdir, ddf, compute=False)
     assert not os.listdir(tmpdir)
     out.compute()
     assert len(os.listdir(tmpdir)) > 0

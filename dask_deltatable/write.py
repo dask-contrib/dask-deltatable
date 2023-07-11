@@ -33,7 +33,7 @@ from toolz.itertoolz import pluck
 from ._schema import pyarrow_to_deltalake, validate_compatible
 
 
-def to_deltalake(
+def to_delta_table(
     table_or_uri: str | Path | DeltaTable,
     df: dd.DataFrame,
     *,
@@ -53,6 +53,7 @@ def to_deltalake(
     overwrite_schema: bool = False,
     storage_options: dict[str, str] | None = None,
     partition_filters: list[tuple[str, str, Any]] | None = None,
+    compute: bool = True,
 ):
     """Write a given dask.DataFrame to a delta table. The returned value is a Dask Scalar,
     and the writing operation is only triggered when calling ``.compute()``
@@ -217,7 +218,10 @@ def to_deltalake(
         )
     }
     graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=(written,))
-    return Scalar(graph, final_name, "")
+    result = Scalar(graph, final_name, "")
+    if compute:
+        result = result.compute()
+    return result
 
 
 def _commit(
