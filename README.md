@@ -1,6 +1,6 @@
 ## Dask-DeltaTable
 
-Reading and writing Delta Tables using Dask engine.
+Reading and writing to Delta Lake using Dask engine.
 
 ### Installation
 
@@ -12,7 +12,7 @@ pip install dask-deltatable
 
 ### Features:
 
-1. Read the parquet files in parallel using Dask engine
+1. Read the parquet files from Delta Lake and parallelize with Dask
 2. Write Dask dataframes to Delta Lake (limited support)
 3. Supports multiple filesystems (s3, azurefs, gcsfs)
 4. Subset of Delta Lake features:
@@ -27,10 +27,10 @@ pip install dask-deltatable
 
 ### Not supported
 
-1. Writing to Delta Table is still in development.
+1. Writing to Delta Lake is still in development.
 2. `optimize` API to run a bin-packing operation on a Delta Table.
 
-### Reading Delta Tables
+### Reading from Delta Lake
 
 ```python
 import dask_deltatable as ddt
@@ -71,6 +71,11 @@ ddt.read_delta_table(catalog="glue", database_name="science", table_name="physic
 ```
 
 ### Inspecting Delta Table history
+
+One of the features of Delta Lake is preserving the history of changes, which can be is useful
+for auditing and debugging. `dask-deltatable` provides APIs to read the commit info and history.
+
+```python
 
 ```python
 # read delta complete history
