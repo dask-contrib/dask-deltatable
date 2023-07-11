@@ -5,7 +5,9 @@ import os
 import zipfile
 from unittest.mock import MagicMock, patch
 
+import pyarrow.parquet as pq
 import pytest
+from deltalake import DeltaTable
 
 import dask_deltatable as ddt
 
@@ -107,15 +109,26 @@ def test_different_schema(simple_table):
     assert df.columns.tolist() == ["id", "count", "temperature", "newColumn"]
 
 
-def test_partition_filter(partition_table):
-    # partition filter
-    df = ddt.read_delta_table(partition_table, version=0, filter=[("col1", "==", 1)])
-    assert df.compute().shape == (21, 3)
-
-    df = ddt.read_delta_table(
-        partition_table, filter=[[("col1", "==", 1)], [("col1", "==", 2)]]
+@pytest.mark.parametrize(
+    "kwargs,shape",
+    [
+        (dict(version=0, filter=[("col1", "==", 1)]), (21, 3)),
+        (dict(filter=[("col1", "==", 1), ("col2", "<", 0.5)]), (11, 4)),
+        (dict(filter=[[("col1", "==", 1)], [("col1", "==", 2)]]), (39, 4)),
+        (dict(filter=[("col1", "!=", 1), ("id", "<", 5)]), (6, 4)),
+        (dict(filter=[[("col1", "!=", 1)], [("id", "<", 5)]]), (99, 4)),
+    ],
+)
+def test_partition_filter(partition_table, kwargs, shape):
+    """partition filter"""
+    df = ddt.read_delta_table(partition_table, **kwargs)
+    filter_expr = pq.filters_to_expression(kwargs["filter"])
+    dt = DeltaTable(partition_table, version=kwargs.get("version"))
+    expected_partitions = len(
+        list(dt.to_pyarrow_dataset().get_fragments(filter=filter_expr))
     )
-    assert df.compute().shape == (39, 4)
+    assert df.npartitions == expected_partitions
+    assert df.compute().shape == shape
 
 
 def test_empty(empty_table1, empty_table2):
