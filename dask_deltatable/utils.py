@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, cast
+from typing import cast
 
 from .types import Filter, Filters
 
@@ -34,7 +34,7 @@ def get_partition_filters(
         return None
 
     if isinstance(filters[0][0], str):
-        filters = cast(List[List[Filter]], [filters])
+        filters = cast(list[list[Filter]], [filters])
 
     allowed_ops = {
         "=": "=",
