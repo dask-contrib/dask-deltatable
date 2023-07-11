@@ -8,13 +8,24 @@ from urllib.parse import urlparse
 
 import dask
 import dask.dataframe as dd
+import pyarrow as pa
 import pyarrow.parquet as pq
 from dask.base import tokenize
 from dask.dataframe.utils import make_meta
 from dask.delayed import delayed
 from deltalake import DataCatalog, DeltaTable
 from fsspec.core import get_fs_token_paths
+from packaging.version import Version
 from pyarrow import dataset as pa_ds
+
+from .types import Filters
+from .utils import get_partition_filters
+
+if Version(pa.__version__) >= Version("10.0.0"):
+    filters_to_expression = pq.filters_to_expression
+else:
+    # fallback to older internal method
+    filters_to_expression = pq._filters_to_expression
 
 
 class DeltaTableWrapper:
@@ -55,14 +66,7 @@ class DeltaTableWrapper:
     def read_delta_dataset(self, f: str, **kwargs: dict[Any, Any]):
         schema = kwargs.pop("schema", None) or self.schema
         filter = kwargs.pop("filter", None)
-        if filter:
-            try:
-                filter_expression = pq.filters_to_expression(filter)
-            except AttributeError:
-                # fallback to older internal method
-                filter_expression = pq._filters_to_expression(filter)
-        else:
-            filter_expression = None
+        filter_expression = filters_to_expression(filter) if filter else None
         return (
             pa_ds.dataset(
                 source=f,
@@ -144,22 +148,40 @@ class DeltaTableWrapper:
             ]
         return dask.compute(parts)[0]
 
-    def get_pq_files(self) -> list[str]:
+    def get_pq_files(self, filter: Filters = None) -> list[str]:
         """
-        get the list of parquet files after loading the
+        Get the list of parquet files after loading the
         current datetime version
+
+        Parameters
+        ----------
+        filter : list[tuple[str, str, Any]] | list[list[tuple[str, str, Any]]] | None
+            Filters in DNF form.
+
+        Returns
+        -------
+        list[str]
+            List of files matching optional filter.
         """
         __doc__ == self.dt.load_with_datetime.__doc__
-
         if self.datetime is not None:
             self.dt.load_with_datetime(self.datetime)
-        return self.dt.file_uris()
+        partition_filters = get_partition_filters(
+            self.dt.metadata().partition_columns, filter
+        )
+        if not partition_filters:
+            # can't filter
+            return self.dt.file_uris()
+        file_uris = set()
+        for filter_set in partition_filters:
+            file_uris.update(self.dt.file_uris(partition_filters=filter_set))
+        return sorted(list(file_uris))
 
     def read_delta_table(self, **kwargs) -> dd.core.DataFrame:
         """
         Reads the list of parquet files in parallel
         """
-        pq_files = self.get_pq_files()
+        pq_files = self.get_pq_files(filter=kwargs.get("filter", None))
         if len(pq_files) == 0:
             raise RuntimeError("No Parquet files are available")
 
