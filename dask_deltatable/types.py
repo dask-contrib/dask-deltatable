@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Tuple, Union
+from typing import Any, Union
 
-Filter = Tuple[str, str, Any]
-Filters = Union[List[Filter], List[List[Filter]], None]
+Filter = tuple[str, str, Any]
+Filters = Union[list[Filter], list[list[Filter]], None]
