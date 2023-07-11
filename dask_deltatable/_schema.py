@@ -40,8 +40,8 @@ import difflib
 import json
 import logging
 import pprint
+from collections.abc import Iterable
 from copy import deepcopy
-from typing import Iterable
 
 import pandas as pd
 import pyarrow as pa
