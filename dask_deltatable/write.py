@@ -116,6 +116,8 @@ def to_deltalake(
         Options passed to the native delta filesystem. Unused if 'filesystem' is defined
     partition_filters : list[tuple[str, str, Any]] | None. Default None
         The partition filters that will be used for partition overwrite.
+    compute : bool. Default True
+        Whether to trigger the writing operation immediately
 
     Returns
     -------

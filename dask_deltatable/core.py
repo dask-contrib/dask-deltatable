@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import json
 import os
 import warnings
 from functools import partial
 from typing import Any
-from urllib.parse import urlparse
 
-import dask
 import dask.dataframe as dd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from dask.base import tokenize
 from dask.dataframe.utils import make_meta
-from dask.delayed import delayed
 from deltalake import DataCatalog, DeltaTable
 from fsspec.core import get_fs_token_paths
 from packaging.version import Version
@@ -79,75 +75,6 @@ class DeltaTableWrapper:
             .to_table(filter=filter_expression, columns=self.columns)
             .to_pandas()
         )
-
-    def _history_helper(self, log_file_name: str):
-        log = self.fs.cat(log_file_name).decode().split("\n")
-        for line in log:
-            if line:
-                meta_data = json.loads(line)
-                if "commitInfo" in meta_data:
-                    return meta_data["commitInfo"]
-
-    def history(self, limit: int | None = None, **kwargs) -> dd.core.DataFrame:
-        delta_log_path = str(self.path).rstrip("/") + "/_delta_log"
-        log_files = self.fs.glob(f"{delta_log_path}/*.json")
-        if len(log_files) == 0:  # pragma no cover
-            raise RuntimeError(f"No History (logs) found at:- {delta_log_path}/")
-        log_files = sorted(log_files, reverse=True)
-        if limit is None:
-            last_n_files = log_files
-        else:
-            last_n_files = log_files[:limit]
-        parts = [
-            delayed(
-                self._history_helper,
-                name="read-delta-history" + tokenize(self.fs_token, f, **kwargs),
-            )(f, **kwargs)
-            for f in list(last_n_files)
-        ]
-        return dask.compute(parts)[0]
-
-    def _vacuum_helper(self, filename_to_delete: str) -> None:
-        full_path = urlparse(self.path)
-        if full_path.scheme and full_path.netloc:  # pragma no cover
-            # for different storage backend, delta-rs vacuum gives path to the file
-            # it will not provide bucket name and scheme s3 or gcfs etc. so adding
-            # manually
-            filename_to_delete = (
-                f"{full_path.scheme}://{full_path.netloc}/{filename_to_delete}"
-            )
-        self.fs.rm_file(self.path + "/" + filename_to_delete)
-
-    def vacuum(self, retention_hours: int = 168, dry_run: bool = True) -> list[str]:
-        """
-        Run the Vacuum command on the Delta Table: list and delete files no
-        longer referenced by the Delta table and are older than the
-        retention threshold.
-
-        retention_hours: the retention threshold in hours, if none then
-        the value from `configuration.deletedFileRetentionDuration` is used
-         or default of 1 week otherwise.
-        dry_run: when activated, list only the files, delete otherwise
-
-        Returns
-        -------
-        the list of files no longer referenced by the Delta Table and are
-         older than the retention threshold.
-        """
-
-        tombstones = self.dt.vacuum(retention_hours=retention_hours)
-        if dry_run:
-            return tombstones
-        else:
-            parts = [
-                delayed(
-                    self._vacuum_helper,
-                    name="delta-vacuum"
-                    + tokenize(self.fs_token, f, retention_hours, dry_run),
-                )(f)
-                for f in tombstones
-            ]
-        return dask.compute(parts)[0]
 
     def get_pq_files(self, filter: Filters = None) -> list[str]:
         """
@@ -330,74 +257,3 @@ def read_delta_table(*args, **kwargs):
 
 
 read_delta_table.__doc__ = read_deltalake.__doc__
-
-
-def read_delta_history(
-    path: str,
-    limit: int | None = None,
-    storage_options: dict[str, str] | None = None,
-    delta_storage_options: dict[str, str] | None = None,
-) -> dd.core.DataFrame:
-    """
-    Run the history command on the DeltaTable.
-    The operations are returned in reverse chronological order.
-
-    Parallely reads delta log json files using dask delayed and gathers the
-    list of commit_info (history)
-
-    Parameters
-    ----------
-    path: str
-        path of Delta table directory
-    limit: int, default None
-        the commit info limit to return, defaults to return all history
-
-    Returns
-    -------
-        list of the commit infos registered in the transaction log
-    """
-
-    dtw = DeltaTableWrapper(
-        path=path,
-        version=None,
-        columns=None,
-        storage_options=storage_options,
-        delta_storage_options=delta_storage_options,
-    )
-    return dtw.history(limit=limit)
-
-
-def vacuum(
-    path: str,
-    retention_hours: int = 168,
-    dry_run: bool = True,
-    storage_options: dict[str, str] | None = None,
-    delta_storage_options: dict[str, str] | None = None,
-) -> list[str]:
-    """
-    Run the Vacuum command on the Delta Table: list and delete
-    files no longer referenced by the Delta table and are
-    older than the retention threshold.
-
-    retention_hours: int, default 168
-    the retention threshold in hours, if none then the value
-    from `configuration.deletedFileRetentionDuration` is used
-    or default of 1 week otherwise.
-    dry_run: bool, default True
-        when activated, list only the files, delete otherwise
-
-    Returns
-    -------
-    List of tombstones
-    i.e the list of files no longer referenced by the Delta Table
-    and are older than the retention threshold.
-    """
-
-    dtw = DeltaTableWrapper(
-        path=path,
-        version=None,
-        columns=None,
-        storage_options=storage_options,
-        delta_storage_options=delta_storage_options,
-    )
-    return dtw.vacuum(retention_hours=retention_hours, dry_run=dry_run)

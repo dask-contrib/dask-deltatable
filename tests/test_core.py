@@ -60,14 +60,6 @@ def checkpoint_table(tmpdir):
     return str(output_dir) + "/checkpoint/"
 
 
-@pytest.fixture()
-def vacuum_table(tmpdir):
-    output_dir = tmpdir
-    deltaf = zipfile.ZipFile("tests/data/vacuum.zip")
-    deltaf.extractall(output_dir)
-    return str(output_dir) + "/vaccum_table"
-
-
 def test_read_delta(simple_table):
     df = ddt.read_deltalake(simple_table)
 
@@ -197,48 +189,6 @@ def test_load_with_datetime(simple_table2):
         simple_table2, datetime="2020-05-25T22:47:31-07:00"
     ).compute()
     assert expected.equals(result)
-
-
-def test_read_history(checkpoint_table):
-    history = ddt.read_delta_history(checkpoint_table)
-    assert len(history) == 26
-
-    last_commit_info = history[0]
-    last_commit_info == {
-        "timestamp": 1630942389906,
-        "operation": "WRITE",
-        "operationParameters": {"mode": "Append", "partitionBy": "[]"},
-        "readVersion": 24,
-        "isBlindAppend": True,
-        "operationMetrics": {
-            "numFiles": "6",
-            "numOutputBytes": "5147",
-            "numOutputRows": "5",
-        },
-    }
-
-    # check whether the logs are sorted
-    current_timestamp = history[0]["timestamp"]
-    for h in history[1:]:
-        assert current_timestamp > h["timestamp"], "History Not Sorted"
-        current_timestamp = h["timestamp"]
-
-    history = ddt.read_delta_history(checkpoint_table, limit=5)
-    assert len(history) == 5
-
-
-def test_vacuum(vacuum_table):
-    print(vacuum_table)
-    print(os.listdir(vacuum_table))
-    tombstones = ddt.vacuum(vacuum_table, dry_run=True)
-    print(tombstones)
-    assert len(tombstones) == 4
-
-    before_pq_files_len = len(glob.glob(f"{vacuum_table}/*.parquet"))
-    assert before_pq_files_len == 7
-    tombstones = ddt.vacuum(vacuum_table, dry_run=False)
-    after_pq_files_len = len(glob.glob(f"{vacuum_table}/*.parquet"))
-    assert after_pq_files_len == 3
 
 
 def test_read_delta_with_error():
