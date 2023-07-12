@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 
+import dask.dataframe as dd
+import pandas as pd
 import pytest
 from dask.dataframe.utils import assert_eq
 from dask.datasets import timeseries
@@ -41,11 +43,8 @@ def test_roundtrip(tmpdir, with_index):
         # partition_freq="1w",
         dtypes=dtypes,
     )
-    # FIXME: us is the only precision delta supports. This lib should likely
-    # cast this itself
 
     ddf = ddf.reset_index()
-    ddf.timestamp = ddf.timestamp.astype("datetime64[us]")
     if with_index:
         ddf = ddf.set_index("timestamp")
 
@@ -62,3 +61,18 @@ def test_roundtrip(tmpdir, with_index):
     # By default, arrow reads with ns resolution
     ddf.timestamp = ddf.timestamp.astype("datetime64[ns]")
     assert_eq(ddf, ddf_read)
+
+
+@pytest.mark.parametrize("unit", ["s", "ms", "us", "ns"])
+def test_datetime(tmpdir, unit):
+    """Ensure we can write datetime with different resolutions,
+    at least one-way only"""
+    tmpdir = str(tmpdir)
+    ts = pd.date_range("2023-01-01", periods=10, freq="1D", unit=unit)  # type: ignore[call-arg]
+    df = pd.DataFrame({"ts": pd.Series(ts)})
+    ddf = dd.from_pandas(df, npartitions=2)
+    out = to_deltalake(tmpdir, ddf)
+    out.compute()
+    ddf_read = read_delta_table(tmpdir)
+    # arrow reads back with ns
+    assert ddf_read.ts.dtype == "datetime64[ns]"
