@@ -135,6 +135,11 @@ def test_empty(empty_table1, empty_table2):
         _ = ddt.read_deltalake(empty_table2)
 
 
+def test_read_delta_table_warns(simple_table):
+    with pytest.warns(DeprecationWarning, match="`read_delta_table` was renamed"):
+        ddt.read_delta_table(simple_table)
+
+
 def test_checkpoint(checkpoint_table):
     df = ddt.read_deltalake(checkpoint_table, checkpoint=0, version=4)
     assert df.compute().shape[0] == 25
