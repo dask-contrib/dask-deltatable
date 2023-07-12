@@ -21,7 +21,7 @@ from dask.dataframe.utils import assert_eq
 import dask_deltatable as ddt
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(ROOT_DIR, "data", "reader_tests", "generated")
+DATA_DIR = os.path.join(ROOT_DIR, "data", "reader_tests")
 
 
 def test_reader_all_primitive_types():
