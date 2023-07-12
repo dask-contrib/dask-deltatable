@@ -20,6 +20,9 @@ jobs:
         python-version: ["3.9", "3.10", "3.11"]
 
     steps:
+      - name: Support long paths
+        run: git config --global core.longpaths true
+
       - name: Checkout source
         uses: actions/checkout@v2
         with:
