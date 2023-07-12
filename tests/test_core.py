@@ -69,7 +69,7 @@ def vacuum_table(tmpdir):
 
 
 def test_read_delta(simple_table):
-    df = ddt.read_delta_table(simple_table)
+    df = ddt.read_deltalake(simple_table)
 
     assert df.columns.tolist() == ["id", "count", "temperature", "newColumn"]
     assert df.compute().shape == (200, 4)
@@ -77,16 +77,16 @@ def test_read_delta(simple_table):
 
 def test_read_delta_with_different_versions(simple_table):
     print(simple_table)
-    df = ddt.read_delta_table(simple_table, version=0)
+    df = ddt.read_deltalake(simple_table, version=0)
     assert df.compute().shape == (100, 3)
 
-    df = ddt.read_delta_table(simple_table, version=1)
+    df = ddt.read_deltalake(simple_table, version=1)
     assert df.compute().shape == (200, 4)
 
 
 def test_row_filter(simple_table):
     # row filter
-    df = ddt.read_delta_table(
+    df = ddt.read_deltalake(
         simple_table,
         version=0,
         filter=[("count", ">", 30)],
@@ -95,17 +95,17 @@ def test_row_filter(simple_table):
 
 
 def test_different_columns(simple_table):
-    df = ddt.read_delta_table(simple_table, columns=["count", "temperature"])
+    df = ddt.read_deltalake(simple_table, columns=["count", "temperature"])
     assert df.columns.tolist() == ["count", "temperature"]
 
 
 def test_different_schema(simple_table):
     # testing schema evolution
 
-    df = ddt.read_delta_table(simple_table, version=0)
+    df = ddt.read_deltalake(simple_table, version=0)
     assert df.columns.tolist() == ["id", "count", "temperature"]
 
-    df = ddt.read_delta_table(simple_table, version=1)
+    df = ddt.read_deltalake(simple_table, version=1)
     assert df.columns.tolist() == ["id", "count", "temperature", "newColumn"]
 
 
@@ -121,7 +121,7 @@ def test_different_schema(simple_table):
 )
 def test_partition_filter(partition_table, kwargs, shape):
     """partition filter"""
-    df = ddt.read_delta_table(partition_table, **kwargs)
+    df = ddt.read_deltalake(partition_table, **kwargs)
     filter_expr = pq.filters_to_expression(kwargs["filter"])
     dt = DeltaTable(partition_table, version=kwargs.get("version"))
     expected_partitions = len(
@@ -132,38 +132,38 @@ def test_partition_filter(partition_table, kwargs, shape):
 
 
 def test_empty(empty_table1, empty_table2):
-    df = ddt.read_delta_table(empty_table1, version=4)
+    df = ddt.read_deltalake(empty_table1, version=4)
     assert df.compute().shape == (0, 2)
 
-    df = ddt.read_delta_table(empty_table1, version=0)
+    df = ddt.read_deltalake(empty_table1, version=0)
     assert df.compute().shape == (5, 2)
 
     with pytest.raises(RuntimeError):
         # No Parquet files found
-        _ = ddt.read_delta_table(empty_table2)
+        _ = ddt.read_deltalake(empty_table2)
 
 
 def test_checkpoint(checkpoint_table):
-    df = ddt.read_delta_table(checkpoint_table, checkpoint=0, version=4)
+    df = ddt.read_deltalake(checkpoint_table, checkpoint=0, version=4)
     assert df.compute().shape[0] == 25
 
-    df = ddt.read_delta_table(checkpoint_table, checkpoint=10, version=12)
+    df = ddt.read_deltalake(checkpoint_table, checkpoint=10, version=12)
     assert df.compute().shape[0] == 65
 
-    df = ddt.read_delta_table(checkpoint_table, checkpoint=20, version=22)
+    df = ddt.read_deltalake(checkpoint_table, checkpoint=20, version=22)
     assert df.compute().shape[0] == 115
 
     with pytest.raises(Exception):
         # Parquet file with the given checkpoint 30 does not exists:
         # File {checkpoint_path} not found"
-        _ = ddt.read_delta_table(checkpoint_table, checkpoint=30, version=33)
+        _ = ddt.read_deltalake(checkpoint_table, checkpoint=30, version=33)
 
 
 def test_out_of_version_error(simple_table):
     # Cannot time travel Delta table to version 4 , Available versions for given
     # checkpoint 0 are [0,1]
     with pytest.raises(Exception):
-        _ = ddt.read_delta_table(simple_table, version=4)
+        _ = ddt.read_deltalake(simple_table, version=4)
 
 
 def test_load_with_datetime(simple_table2):
@@ -179,21 +179,21 @@ def test_load_with_datetime(simple_table2):
         file_path = os.path.join(log_dir, file_name)
         os.utime(file_path, (dt_epoch, dt_epoch))
 
-    expected = ddt.read_delta_table(simple_table2, version=0).compute()
-    result = ddt.read_delta_table(
+    expected = ddt.read_deltalake(simple_table2, version=0).compute()
+    result = ddt.read_deltalake(
         simple_table2, datetime="2020-05-01T00:47:31-07:00"
     ).compute()
     assert expected.equals(result)
     # assert_frame_equal(expected,result)
 
-    expected = ddt.read_delta_table(simple_table2, version=1).compute()
-    result = ddt.read_delta_table(
+    expected = ddt.read_deltalake(simple_table2, version=1).compute()
+    result = ddt.read_deltalake(
         simple_table2, datetime="2020-05-02T22:47:31-07:00"
     ).compute()
     assert expected.equals(result)
 
-    expected = ddt.read_delta_table(simple_table2, version=4).compute()
-    result = ddt.read_delta_table(
+    expected = ddt.read_deltalake(simple_table2, version=4).compute()
+    result = ddt.read_deltalake(
         simple_table2, datetime="2020-05-25T22:47:31-07:00"
     ).compute()
     assert expected.equals(result)
@@ -243,13 +243,13 @@ def test_vacuum(vacuum_table):
 
 def test_read_delta_with_error():
     with pytest.raises(ValueError) as exc_info:
-        ddt.read_delta_table()
+        ddt.read_deltalake()
     assert str(exc_info.value) == "Please Provide Delta Table path"
 
 
 def test_catalog_with_error():
     with pytest.raises(ValueError) as exc_info:
-        ddt.read_delta_table(catalog="glue")
+        ddt.read_deltalake(catalog="glue")
     assert (
         str(exc_info.value)
         == "Since Catalog was provided, please provide Database and table name"
@@ -267,7 +267,7 @@ def test_catalog(simple_table):
     with patch("deltalake.DeltaTable.from_data_catalog", side_effect=delta_mock):
         os.environ["AWS_ACCESS_KEY_ID"] = "apple"
         os.environ["AWS_SECRET_ACCESS_KEY"] = "greatsecret"
-        df = ddt.read_delta_table(
+        df = ddt.read_deltalake(
             catalog="glue", database_name="stores", table_name="orders"
         )
         assert df.compute().shape == (200, 3)

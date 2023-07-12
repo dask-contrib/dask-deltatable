@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from functools import partial
 from typing import Any
 from urllib.parse import urlparse
@@ -217,7 +218,7 @@ def _read_from_catalog(
     return df
 
 
-def read_delta_table(
+def read_deltalake(
     path: str | None = None,
     catalog: str | None = None,
     database_name: str | None = None,
@@ -292,7 +293,8 @@ def read_delta_table(
 
     Examples
     --------
-    >>> df = dd.read_delta_table('s3://bucket/my-delta-table')  # doctest: +SKIP
+    >>> import dask_deltatable as ddt
+    >>> df = ddt.read_deltalake('s3://bucket/my-delta-table')  # doctest: +SKIP
 
     """
     if catalog is not None:
@@ -317,6 +319,17 @@ def read_delta_table(
         )
         resultdf = dtw.read_delta_table(columns=columns, **kwargs)
     return resultdf
+
+
+def read_delta_table(*args, **kwargs):
+    warnings.warn(
+        "`read_delta_table` was renamed, use `read_deltalake` instead",
+        category=DeprecationWarning,
+    )
+    return read_deltalake(*args, **kwargs)
+
+
+read_delta_table.__doc__ = read_deltalake.__doc__
 
 
 def read_delta_history(

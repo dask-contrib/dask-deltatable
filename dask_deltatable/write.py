@@ -33,7 +33,7 @@ from toolz.itertoolz import pluck
 from ._schema import pyarrow_to_deltalake, validate_compatible
 
 
-def to_delta_table(
+def to_deltalake(
     table_or_uri: str | Path | DeltaTable,
     df: dd.DataFrame,
     *,

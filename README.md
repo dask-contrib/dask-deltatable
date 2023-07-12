@@ -36,13 +36,13 @@ pip install dask-deltatable
 import dask_deltatable as ddt
 
 # read delta table
-ddt.read_delta_table("delta_path")
+ddt.read_deltalake("delta_path")
 
 # with specific version
-ddt.read_delta_table("delta_path", version=3)
+ddt.read_deltalake("delta_path", version=3)
 
 # with specific datetime
-ddt.read_delta_table("delta_path", datetime="2018-12-19T16:39:57-08:00")
+ddt.read_deltalake("delta_path", datetime="2018-12-19T16:39:57-08:00")
 ```
 
 ### Accessing remote file systems
@@ -54,7 +54,7 @@ or config files. For AWS, you may need `~/.aws/credential`; for gcsfs,
 to configure these.
 
 ```python
-ddt.read_delta_table("s3://bucket_name/delta_path", version=3)
+ddt.read_deltalake("s3://bucket_name/delta_path", version=3)
 ```
 
 ### Accessing AWS Glue catalog
@@ -67,7 +67,7 @@ environment variables, and if those are not available, fall back to
 Example:
 
 ```python
-ddt.read_delta_table(catalog="glue", database_name="science", table_name="physics")
+ddt.read_deltalake(catalog="glue", database_name="science", table_name="physics")
 ```
 
 ### Inspecting Delta Table history
