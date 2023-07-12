@@ -26,7 +26,8 @@ from dask_deltatable.write import to_deltalake
         False,
     ],
 )
-def test_roundtrip(tmpdir, with_index):
+@pytest.mark.parametrize("freq,partition_freq", [("1H", "1D"), ("1H", "1w")])
+def test_roundtrip(tmpdir, with_index, freq, partition_freq):
     dtypes = {
         "str": object,
         # FIXME: Categorical data does not work
@@ -38,9 +39,8 @@ def test_roundtrip(tmpdir, with_index):
     ddf = timeseries(
         start="2023-01-01",
         end="2023-01-15",
-        # FIXME: Setting the partition frequency destroys the roundtrip for some
-        # reason
-        # partition_freq="1w",
+        freq=freq,
+        partition_freq=partition_freq,
         dtypes=dtypes,
     )
 
@@ -58,6 +58,7 @@ def test_roundtrip(tmpdir, with_index):
     if with_index:
         ddf = ddf.reset_index()
 
+    assert ddf.npartitions == ddf_read.npartitions
     # By default, arrow reads with ns resolution
     ddf.timestamp = ddf.timestamp.astype("datetime64[ns]")
     assert_eq(ddf, ddf_read)
