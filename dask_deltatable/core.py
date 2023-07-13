@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import warnings
 from functools import partial
 from typing import Any
 
@@ -246,14 +245,3 @@ def read_deltalake(
         )
         resultdf = dtw.read_delta_table(columns=columns, **kwargs)
     return resultdf
-
-
-def read_delta_table(*args, **kwargs):
-    warnings.warn(
-        "`read_delta_table` was renamed, use `read_deltalake` instead",
-        category=DeprecationWarning,
-    )
-    return read_deltalake(*args, **kwargs)
-
-
-read_delta_table.__doc__ = read_deltalake.__doc__
