@@ -134,3 +134,6 @@ dmypy.json
 .pyre/
 .DS_Store
 junit/
+
+# downloaded DAT files: https://github.com/delta-incubator/dat
+tests/out/

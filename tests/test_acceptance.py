@@ -13,6 +13,8 @@ don't require any particular dependency or programming language.
 from __future__ import annotations
 
 import os
+import shutil
+from urllib.request import urlretrieve
 
 import dask.dataframe as dd
 import pytest
@@ -20,8 +22,24 @@ from dask.dataframe.utils import assert_eq
 
 import dask_deltatable as ddt
 
+DATA_VERSION = "0.0.2"
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(ROOT_DIR, "data", "reader_tests")
+DATA_DIR = os.path.join(ROOT_DIR, "out", "reader_tests", "generated")
+
+
+@pytest.fixture(autouse=True, scope="session")
+def download_data():
+    """Download the data for the tests."""
+    if not os.path.exists(DATA_DIR):
+        filename = f"deltalake-dat-v{DATA_VERSION}.tar.gz"
+        dest_filename = os.path.join(ROOT_DIR, filename)
+        urlretrieve(
+            f"https://github.com/delta-incubator/dat/releases/download/v{DATA_VERSION}/{filename}",
+            dest_filename,
+        )
+        shutil.unpack_archive(dest_filename, ROOT_DIR)
+        os.remove(dest_filename)
+        assert os.path.exists(DATA_DIR)
 
 
 def test_reader_all_primitive_types():
