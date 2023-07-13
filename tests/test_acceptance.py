@@ -43,7 +43,7 @@ def download_data():
 
 
 def test_reader_all_primitive_types():
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/all_primitive_types/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/all_primitive_types/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/all_primitive_types/expected/latest/table_content/*parquet"
     )
@@ -52,7 +52,7 @@ def test_reader_all_primitive_types():
 
 @pytest.mark.parametrize("version,subdir", [(None, "latest"), (0, "v0"), (1, "v1")])
 def test_reader_basic_append(version, subdir):
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/basic_append/delta", version=version)
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/basic_append/delta", version=version)
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/basic_append/expected/{subdir}/table_content/*parquet"
     )
@@ -61,7 +61,7 @@ def test_reader_basic_append(version, subdir):
 
 @pytest.mark.parametrize("version,subdir", [(None, "latest"), (0, "v0"), (1, "v1")])
 def test_reader_basic_partitioned(version, subdir):
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/basic_partitioned/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/basic_partitioned/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/basic_partitioned/expected/latest/table_content/*parquet"
     )
@@ -73,7 +73,7 @@ def test_reader_basic_partitioned(version, subdir):
     "version,subdir", [(None, "latest"), (0, "v0"), (1, "v1"), (2, "v2")]
 )
 def test_reader_multi_partitioned(version, subdir):
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/multi_partitioned/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/multi_partitioned/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/multi_partitioned/expected/{subdir}/table_content/*parquet"
     )
@@ -82,7 +82,7 @@ def test_reader_multi_partitioned(version, subdir):
 
 @pytest.mark.xfail(reason="https://github.com/delta-io/delta-rs/issues/1533")
 def test_reader_multi_partitioned_2():
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/multi_partitioned_2/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/multi_partitioned_2/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/multi_partitioned_2/expected/latest/table_content/*parquet"
     )
@@ -90,7 +90,7 @@ def test_reader_multi_partitioned_2():
 
 
 def test_reader_nested_types():
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/nested_types/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/nested_types/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/nested_types/expected/latest/table_content/*parquet"
     )
@@ -98,7 +98,7 @@ def test_reader_nested_types():
 
 
 def test_reader_no_replay():
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/no_replay/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/no_replay/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/no_replay/expected/latest/table_content/*parquet"
     )
@@ -106,7 +106,7 @@ def test_reader_no_replay():
 
 
 def test_reader_no_stats():
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/no_stats/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/no_stats/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/no_stats/expected/latest/table_content/*parquet"
     )
@@ -114,7 +114,7 @@ def test_reader_no_stats():
 
 
 def test_reader_stats_as_structs():
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/stats_as_struct/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/stats_as_struct/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/stats_as_struct/expected/latest/table_content/*parquet"
     )
@@ -122,7 +122,7 @@ def test_reader_stats_as_structs():
 
 
 def test_reader_with_checkpoint():
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/with_checkpoint/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/with_checkpoint/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/with_checkpoint/expected/latest/table_content/*parquet"
     )
@@ -131,7 +131,7 @@ def test_reader_with_checkpoint():
 
 @pytest.mark.parametrize("version,subdir", [(None, "latest"), (1, "v1")])
 def test_reader_with_schema_change(version, subdir):
-    actual_ddf = ddt.read_delta_table(f"{DATA_DIR}/with_schema_change/delta")
+    actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/with_schema_change/delta")
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/with_schema_change/expected/{subdir}/table_content/*parquet"
     )

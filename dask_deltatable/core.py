@@ -54,15 +54,19 @@ class DeltaTableWrapper:
             path, storage_options=storage_options
         )
         self.schema = self.dt.schema().to_pyarrow()
-        meta = make_meta(self.schema.empty_table().to_pandas())
+
+    def meta(self, **kwargs):
+        """Pass kwargs to `to_pandas` call when creating the metadata"""
+        meta = make_meta(self.schema.empty_table().to_pandas(**kwargs))
         if self.columns:
             meta = meta[self.columns]
-        self.meta = meta
+        return meta
 
     def read_delta_dataset(self, f: str, **kwargs: dict[Any, Any]):
         schema = kwargs.pop("schema", None) or self.schema
         filter = kwargs.pop("filter", None)
         filter_expression = filters_to_expression(filter) if filter else None
+        to_pandas_kwargs = kwargs.pop("pyarrow_to_pandas", {})
         return (
             pa_ds.dataset(
                 source=f,
@@ -72,7 +76,7 @@ class DeltaTableWrapper:
                 partitioning="hive",
             )
             .to_table(filter=filter_expression, columns=self.columns)
-            .to_pandas()
+            .to_pandas(**to_pandas_kwargs)
         )
 
     def get_pq_files(self, filter: Filters = None) -> list[str]:
@@ -112,10 +116,12 @@ class DeltaTableWrapper:
         if len(pq_files) == 0:
             raise RuntimeError("No Parquet files are available")
 
+        meta = self.meta(**kwargs.get("pyarrow_to_pandas", {}))
+
         return dd.from_map(
             partial(self.read_delta_dataset, **kwargs),
             pq_files,
-            meta=self.meta,
+            meta=meta,
             label="read-delta-table",
             token=tokenize(self.fs_token, **kwargs),
         )
@@ -198,6 +204,7 @@ def read_deltalake(
         Some most used parameters can be passed here are:
         1. schema
         2. filter
+        3. pyarrow_to_pandas
 
         schema : pyarrow.Schema
             Used to maintain schema evolution in deltatable.
@@ -212,6 +219,19 @@ def read_deltalake(
             converted into pyarrow.dataset.Expression built using pyarrow.dataset.Field
             example:
                 [("x",">",400)] --> pyarrow.dataset.field("x")>400
+
+        pyarrow_to_pandas: dict
+            Options to pass directly to pyarrow.Table.to_pandas.
+            Common options include:
+            * categories: list[str]
+                List of columns to treat as pandas.Categorical
+            * strings_to_categorical: bool
+                Encode string (UTF8) and binary types to pandas.Categorical.
+            * types_mapper: Callable
+                A function mapping a pyarrow DataType to a pandas ExtensionDtype
+
+            See https://arrow.apache.org/docs/python/generated/pyarrow.Table.html#pyarrow.Table.to_pandas
+            for more.
 
     Returns
     -------
