@@ -53,6 +53,7 @@ def to_deltalake(
     overwrite_schema: bool = False,
     storage_options: dict[str, str] | None = None,
     partition_filters: list[tuple[str, str, Any]] | None = None,
+    compute: bool = True,
 ):
     """Write a given dask.DataFrame to a delta table. The returned value is a Dask Scalar,
     and the writing operation is only triggered when calling ``.compute()``
@@ -115,6 +116,8 @@ def to_deltalake(
         Options passed to the native delta filesystem. Unused if 'filesystem' is defined
     partition_filters : list[tuple[str, str, Any]] | None. Default None
         The partition filters that will be used for partition overwrite.
+    compute : bool. Default True
+        Whether to trigger the writing operation immediately
 
     Returns
     -------
@@ -217,7 +220,10 @@ def to_deltalake(
         )
     }
     graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=(written,))
-    return Scalar(graph, final_name, "")
+    result = Scalar(graph, final_name, "")
+    if compute:
+        result = result.compute()
+    return result
 
 
 def _commit(

@@ -8,7 +8,7 @@ import pytest
 from dask.dataframe.utils import assert_eq
 from dask.datasets import timeseries
 
-from dask_deltatable import read_delta_table
+from dask_deltatable import read_deltalake
 from dask_deltatable.write import to_deltalake
 
 
@@ -48,12 +48,12 @@ def test_roundtrip(tmpdir, with_index, freq, partition_freq):
     if with_index:
         ddf = ddf.set_index("timestamp")
 
-    out = to_deltalake(tmpdir, ddf)
+    out = to_deltalake(tmpdir, ddf, compute=False)
     assert not os.listdir(tmpdir)
     out.compute()
     assert len(os.listdir(tmpdir)) > 0
 
-    ddf_read = read_delta_table(tmpdir)
+    ddf_read = read_deltalake(tmpdir)
     # FIXME: The index is not recovered
     if with_index:
         ddf = ddf.reset_index()
@@ -72,8 +72,7 @@ def test_datetime(tmpdir, unit):
     ts = pd.date_range("2023-01-01", periods=10, freq="1D", unit=unit)  # type: ignore[call-arg]
     df = pd.DataFrame({"ts": pd.Series(ts)})
     ddf = dd.from_pandas(df, npartitions=2)
-    out = to_deltalake(tmpdir, ddf)
-    out.compute()
-    ddf_read = read_delta_table(tmpdir)
+    to_deltalake(tmpdir, ddf)
+    ddf_read = read_deltalake(tmpdir)
     # arrow reads back with ns
     assert ddf_read.ts.dtype == "datetime64[ns]"

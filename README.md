@@ -21,9 +21,6 @@ pip install dask-deltatable
    - Parquet filters
      - row filter
      - partition filter
-5. Query Delta commit info and history
-6. API to ``vacuum`` the old / unused parquet files
-7. Load different versions of data by timestamp or version.
 
 ### Not supported
 
@@ -36,13 +33,13 @@ pip install dask-deltatable
 import dask_deltatable as ddt
 
 # read delta table
-ddt.read_delta_table("delta_path")
+ddt.read_deltalake("delta_path")
 
 # with specific version
-ddt.read_delta_table("delta_path", version=3)
+ddt.read_deltalake("delta_path", version=3)
 
 # with specific datetime
-ddt.read_delta_table("delta_path", datetime="2018-12-19T16:39:57-08:00")
+ddt.read_deltalake("delta_path", datetime="2018-12-19T16:39:57-08:00")
 ```
 
 ### Accessing remote file systems
@@ -54,7 +51,7 @@ or config files. For AWS, you may need `~/.aws/credential`; for gcsfs,
 to configure these.
 
 ```python
-ddt.read_delta_table("s3://bucket_name/delta_path", version=3)
+ddt.read_deltalake("s3://bucket_name/delta_path", version=3)
 ```
 
 ### Accessing AWS Glue catalog
@@ -67,32 +64,21 @@ environment variables, and if those are not available, fall back to
 Example:
 
 ```python
-ddt.read_delta_table(catalog="glue", database_name="science", table_name="physics")
+ddt.read_deltalake(catalog="glue", database_name="science", table_name="physics")
 ```
 
-### Inspecting Delta Table history
+### Writing to Delta Lake
 
-One of the features of Delta Lake is preserving the history of changes, which can be is useful
-for auditing and debugging. `dask-deltatable` provides APIs to read the commit info and history.
-
-```python
+To write a Dask dataframe to Delta Lake, use `to_deltalake` method.
 
 ```python
-# read delta complete history
-ddt.read_delta_history("delta_path")
+import dask.dataframe as dd
+import dask_deltatable as ddt
 
-# read delta history upto given limit
-ddt.read_delta_history("delta_path", limit=5)
+df = dd.read_csv("s3://bucket_name/data.csv")
+# do some processing on the dataframe...
+ddt.to_deltalake(df, "s3://bucket_name/delta_path")
 ```
 
-### Managing Delta Tables
-
-Vacuuming a table will delete any files that have been marked for deletion. This
-may make some past versions of a table invalid, so this can break time travel.
-However, it will save storage space. Vacuum will retain files in a certain
-window, by default one week, so time travel will still work in shorter ranges.
-
-```python
-# read delta history to delete the files
-ddt.vacuum("delta_path", dry_run=False)
-```
+Writing to Delta Lake is still in development, so be aware that some features
+may not work.
