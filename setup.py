@@ -9,7 +9,7 @@ with open("README.md", encoding="utf-8") as f:
 
 setup(
     name="dask-deltatable",
-    version="0.3rc",
+    version="0.3",
     description="Dask + Delta Table ",
     maintainer="rajagurunath",
     maintainer_email="gurunathrajagopal@gmail.com",
