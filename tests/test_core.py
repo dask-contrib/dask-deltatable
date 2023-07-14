@@ -5,17 +5,22 @@ import os
 import zipfile
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 from deltalake import DeltaTable
 
 import dask_deltatable as ddt
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+
 
 @pytest.fixture()
 def simple_table(tmpdir):
     output_dir = tmpdir
-    deltaf = zipfile.ZipFile("tests/data/simple.zip")
+    deltaf = zipfile.ZipFile(f"{DATA_DIR}/simple.zip")
     deltaf.extractall(output_dir)
     return str(output_dir) + "/test1/"
 
@@ -23,7 +28,7 @@ def simple_table(tmpdir):
 @pytest.fixture()
 def simple_table2(tmpdir):
     output_dir = tmpdir
-    deltaf = zipfile.ZipFile("tests/data/simple2.zip")
+    deltaf = zipfile.ZipFile(f"{DATA_DIR}/simple2.zip")
     deltaf.extractall(output_dir)
     return str(output_dir) + "/simple_table/"
 
@@ -31,7 +36,7 @@ def simple_table2(tmpdir):
 @pytest.fixture()
 def partition_table(tmpdir):
     output_dir = tmpdir
-    deltaf = zipfile.ZipFile("tests/data/partition.zip")
+    deltaf = zipfile.ZipFile(f"{DATA_DIR}/partition.zip")
     deltaf.extractall(output_dir)
     return str(output_dir) + "/test2/"
 
@@ -39,7 +44,7 @@ def partition_table(tmpdir):
 @pytest.fixture()
 def empty_table1(tmpdir):
     output_dir = tmpdir
-    deltaf = zipfile.ZipFile("tests/data/empty1.zip")
+    deltaf = zipfile.ZipFile(f"{DATA_DIR}/empty1.zip")
     deltaf.extractall(output_dir)
     return str(output_dir) + "/empty/"
 
@@ -47,7 +52,7 @@ def empty_table1(tmpdir):
 @pytest.fixture()
 def empty_table2(tmpdir):
     output_dir = tmpdir
-    deltaf = zipfile.ZipFile("tests/data/empty2.zip")
+    deltaf = zipfile.ZipFile(f"{DATA_DIR}/empty2.zip")
     deltaf.extractall(output_dir)
     return str(output_dir) + "/empty2/"
 
@@ -55,7 +60,7 @@ def empty_table2(tmpdir):
 @pytest.fixture()
 def checkpoint_table(tmpdir):
     output_dir = tmpdir
-    deltaf = zipfile.ZipFile("tests/data/checkpoint.zip")
+    deltaf = zipfile.ZipFile(f"{DATA_DIR}/checkpoint.zip")
     deltaf.extractall(output_dir)
     return str(output_dir) + "/checkpoint/"
 
@@ -65,6 +70,31 @@ def test_read_delta(simple_table):
 
     assert df.columns.tolist() == ["id", "count", "temperature", "newColumn"]
     assert df.compute().shape == (200, 4)
+
+
+def test_read_delta_types_mapper(simple_table):
+    """Provide a custom types mapper"""
+
+    def types_mapper(pyarrow_dtype):
+        if pyarrow_dtype == pa.int64():
+            return pd.Int32Dtype()
+
+    df = ddt.read_deltalake(
+        simple_table, pyarrow_to_pandas={"types_mapper": types_mapper}
+    )
+    assert df.dtypes["id"] == "Int32"
+    assert df.dtypes["count"] == "Int32"
+    res = df.compute()
+    assert res.dtypes["id"] == "Int32"
+    assert res.dtypes["count"] == "Int32"
+
+
+def test_read_delta_categories(simple_table):
+    """Provide a list of categories"""
+    df = ddt.read_deltalake(simple_table, pyarrow_to_pandas={"categories": ["id"]})
+    assert df.dtypes["id"] == "category"
+    res = df.compute()
+    assert res.dtypes["id"] == "category"
 
 
 def test_read_delta_with_different_versions(simple_table):
