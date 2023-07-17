@@ -41,7 +41,7 @@ def to_deltalake(
     partition_by: list[str] | str | None = None,
     filesystem: pa_fs.FileSystem | None = None,
     mode: Literal["error", "append", "overwrite", "ignore"] = "error",
-    file_options: ds.ParquetFileWriteOptions | None = None,
+    file_options: Mapping[str, Any] | None = None,
     max_partitions: int | None = None,
     max_open_files: int = 1024,
     max_rows_per_file: int = 10 * 1024 * 1024,
@@ -78,9 +78,8 @@ def to_deltalake(
         If 'append', will add new data.
         If 'overwrite', will replace table with new data.
         If 'ignore', will not write anything if table already exists.
-    file_options : ds.ParquetFileWriteOptions | None. Default None
-        Optional write options for Parquet (ParquetFileWriteOptions).
-        Can be provided with defaults using ParquetFileWriteOptions().make_write_options().
+    file_options : Mapping[str, Any] | None. Default None
+        Optional dict of options that can be used to initialize ParquetFileWriteOptions.
         Please refer to https://github.com/apache/arrow/blob/master/python/pyarrow/_dataset_parquet.pyx
         for the list of available options
     max_partitions : int | None. Default None
@@ -314,6 +313,9 @@ def _write_partition(
                 json.dumps(stats, cls=DeltaJSONEncoder),
             )
         )
+
+    if file_options is not None:
+        file_options = ds.ParquetFileFormat().make_write_options(**file_options)
 
     ds.write_dataset(
         data,
