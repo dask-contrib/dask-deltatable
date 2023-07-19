@@ -45,15 +45,18 @@ class DeltaTableWrapper:
         self.columns = columns
         self.datetime = datetime
         self.storage_options = storage_options
-        self.dt = DeltaTable(
-            table_uri=self.path,
-            version=self.version,
-            storage_options=delta_storage_options,
-        )
+        self.delta_storage_options = delta_storage_options
         self.fs, self.fs_token, _ = get_fs_token_paths(
             path, storage_options=storage_options
         )
-        self.schema = self.dt.schema().to_pyarrow()
+        self.schema = self._table().schema().to_pyarrow()
+
+    def _table(self):
+        return DeltaTable(
+            table_uri=self.path,
+            version=self.version,
+            storage_options=self.delta_storage_options,
+        )
 
     def meta(self, **kwargs):
         """Pass kwargs to `to_pandas` call when creating the metadata"""
@@ -94,18 +97,18 @@ class DeltaTableWrapper:
         list[str]
             List of files matching optional filter.
         """
-        __doc__ == self.dt.load_with_datetime.__doc__
+        dt = self._table()
         if self.datetime is not None:
-            self.dt.load_with_datetime(self.datetime)
+            dt.load_with_datetime(self.datetime)
         partition_filters = get_partition_filters(
-            self.dt.metadata().partition_columns, filter
+            dt.metadata().partition_columns, filter
         )
         if not partition_filters:
             # can't filter
-            return self.dt.file_uris()
+            return dt.file_uris()
         file_uris = set()
         for filter_set in partition_filters:
-            file_uris.update(self.dt.file_uris(partition_filters=filter_set))
+            file_uris.update(dt.file_uris(partition_filters=filter_set))
         return sorted(list(file_uris))
 
     def read_delta_table(self, **kwargs) -> dd.core.DataFrame:

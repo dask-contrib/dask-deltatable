@@ -79,3 +79,9 @@ def test_write_with_schema(client, tmpdir):
     ddt.to_deltalake(f"{tmpdir}", ddf, schema=schema)
     ds = pa_ds.dataset(str(tmpdir))
     assert ds.schema == schema
+
+
+def test_read(client, simple_table):
+    df = ddt.read_deltalake(simple_table)
+    assert df.columns.tolist() == ["id", "count", "temperature", "newColumn"]
+    assert df.compute().shape == (200, 4)

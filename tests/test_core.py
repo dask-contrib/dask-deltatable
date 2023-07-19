@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import glob
 import os
-import zipfile
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -12,57 +11,6 @@ import pytest
 from deltalake import DeltaTable
 
 import dask_deltatable as ddt
-
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(ROOT_DIR, "data")
-
-
-@pytest.fixture()
-def simple_table(tmpdir):
-    output_dir = tmpdir
-    deltaf = zipfile.ZipFile(f"{DATA_DIR}/simple.zip")
-    deltaf.extractall(output_dir)
-    return str(output_dir) + "/test1/"
-
-
-@pytest.fixture()
-def simple_table2(tmpdir):
-    output_dir = tmpdir
-    deltaf = zipfile.ZipFile(f"{DATA_DIR}/simple2.zip")
-    deltaf.extractall(output_dir)
-    return str(output_dir) + "/simple_table/"
-
-
-@pytest.fixture()
-def partition_table(tmpdir):
-    output_dir = tmpdir
-    deltaf = zipfile.ZipFile(f"{DATA_DIR}/partition.zip")
-    deltaf.extractall(output_dir)
-    return str(output_dir) + "/test2/"
-
-
-@pytest.fixture()
-def empty_table1(tmpdir):
-    output_dir = tmpdir
-    deltaf = zipfile.ZipFile(f"{DATA_DIR}/empty1.zip")
-    deltaf.extractall(output_dir)
-    return str(output_dir) + "/empty/"
-
-
-@pytest.fixture()
-def empty_table2(tmpdir):
-    output_dir = tmpdir
-    deltaf = zipfile.ZipFile(f"{DATA_DIR}/empty2.zip")
-    deltaf.extractall(output_dir)
-    return str(output_dir) + "/empty2/"
-
-
-@pytest.fixture()
-def checkpoint_table(tmpdir):
-    output_dir = tmpdir
-    deltaf = zipfile.ZipFile(f"{DATA_DIR}/checkpoint.zip")
-    deltaf.extractall(output_dir)
-    return str(output_dir) + "/checkpoint/"
 
 
 def test_read_delta(simple_table):
