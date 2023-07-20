@@ -52,7 +52,7 @@ def _get_pq_files(dt: DeltaTable, filter: Filters = None) -> list[str]:
     return sorted(list(file_uris))
 
 
-def _read_delta_dataset(
+def _read_delta_partition(
     filename: str,
     schema: pa.Schema,
     fs: Any,
@@ -109,7 +109,7 @@ def _read_from_filesystem(
         meta = meta[columns]
 
     return dd.from_map(
-        partial(_read_delta_dataset, fs=fs, columns=columns, schema=schema, **kwargs),
+        partial(_read_delta_partition, fs=fs, columns=columns, schema=schema, **kwargs),
         pq_files,
         meta=meta,
         label="read-delta-table",
