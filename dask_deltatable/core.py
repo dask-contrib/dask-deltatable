@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from functools import partial
-from typing import Any
+from typing import Any, cast
 
 import dask.dataframe as dd
 import pyarrow as pa
@@ -24,110 +25,96 @@ else:
     filters_to_expression = pq._filters_to_expression
 
 
-class DeltaTableWrapper:
-    path: str
-    version: int | None
-    columns: list[str] | None
-    datetime: str | None
-    storage_options: dict[str, Any] | None
+def _get_pq_files(dt: DeltaTable, filter: Filters = None) -> list[str]:
+    """
+    Get the list of parquet files after loading the
+    current datetime version
 
-    def __init__(
-        self,
-        path: str,
-        version: int | None,
-        columns: list[str] | None,
-        datetime: str | None = None,
-        storage_options: dict[str, str] | None = None,
-        delta_storage_options: dict[str, str] | None = None,
-    ) -> None:
-        self.path: str = path
-        self.version: int = version
-        self.columns = columns
-        self.datetime = datetime
-        self.storage_options = storage_options
-        self.delta_storage_options = delta_storage_options
-        self.fs, self.fs_token, _ = get_fs_token_paths(
-            path, storage_options=storage_options
+    Parameters
+    ----------
+    dt : DeltaTable
+        DeltaTable instance
+    filter : list[tuple[str, str, Any]] | list[list[tuple[str, str, Any]]] | None
+        Filters in DNF form.
+
+    Returns
+    -------
+    list[str]
+        List of files matching optional filter.
+    """
+    partition_filters = get_partition_filters(dt.metadata().partition_columns, filter)
+    if not partition_filters:
+        # can't filter
+        return dt.file_uris()
+    file_uris = set()
+    for filter_set in partition_filters:
+        file_uris.update(dt.file_uris(partition_filters=filter_set))
+    return sorted(list(file_uris))
+
+
+def _read_delta_dataset(
+    filename: str,
+    schema: pa.Schema,
+    fs: Any,
+    columns: Sequence[str] | None,
+    filter: Filters = None,
+    pyarrow_to_pandas: dict[str, Any] | None = None,
+    **_kwargs: dict[str, Any],
+):
+    filter_expression = filters_to_expression(filter) if filter else None
+    if pyarrow_to_pandas is None:
+        pyarrow_to_pandas = {}
+    return (
+        pa_ds.dataset(
+            source=filename,
+            schema=schema,
+            filesystem=fs,
+            format="parquet",
+            partitioning="hive",
         )
-        self.schema = self._table().schema().to_pyarrow()
+        .to_table(filter=filter_expression, columns=columns)
+        .to_pandas(**pyarrow_to_pandas)
+    )
 
-    def _table(self):
-        return DeltaTable(
-            table_uri=self.path,
-            version=self.version,
-            storage_options=self.delta_storage_options,
-        )
 
-    def meta(self, **kwargs):
-        """Pass kwargs to `to_pandas` call when creating the metadata"""
-        meta = make_meta(self.schema.empty_table().to_pandas(**kwargs))
-        if self.columns:
-            meta = meta[self.columns]
-        return meta
+def _read_from_filesystem(
+    path: str,
+    version: int | None,
+    columns: Sequence[str] | None,
+    datetime: str | None = None,
+    storage_options: dict[str, str] | None = None,
+    delta_storage_options: dict[str, str] | None = None,
+    **kwargs: dict[str, Any],
+) -> dd.core.DataFrame:
+    """
+    Reads the list of parquet files in parallel
+    """
+    fs, fs_token, _ = get_fs_token_paths(path, storage_options=storage_options)
+    dt = DeltaTable(
+        table_uri=path, version=version, storage_options=delta_storage_options
+    )
+    if datetime is not None:
+        dt.load_with_datetime(datetime)
 
-    def read_delta_dataset(self, f: str, **kwargs: dict[Any, Any]):
-        schema = kwargs.pop("schema", None) or self.schema
-        filter = kwargs.pop("filter", None)
-        filter_expression = filters_to_expression(filter) if filter else None
-        to_pandas_kwargs = kwargs.pop("pyarrow_to_pandas", {})
-        return (
-            pa_ds.dataset(
-                source=f,
-                schema=schema,
-                filesystem=self.fs,
-                format="parquet",
-                partitioning="hive",
-            )
-            .to_table(filter=filter_expression, columns=self.columns)
-            .to_pandas(**to_pandas_kwargs)
-        )
+    schema = dt.schema().to_pyarrow()
 
-    def get_pq_files(self, filter: Filters = None) -> list[str]:
-        """
-        Get the list of parquet files after loading the
-        current datetime version
+    filter_value = cast(Filters, kwargs.get("filter", None))
+    pq_files = _get_pq_files(dt, filter=filter_value)
+    if len(pq_files) == 0:
+        raise RuntimeError("No Parquet files are available")
 
-        Parameters
-        ----------
-        filter : list[tuple[str, str, Any]] | list[list[tuple[str, str, Any]]] | None
-            Filters in DNF form.
+    mapper_kwargs = kwargs.get("pyarrow_to_pandas", {})
+    meta = make_meta(schema.empty_table().to_pandas(**mapper_kwargs))
+    if columns:
+        meta = meta[columns]
 
-        Returns
-        -------
-        list[str]
-            List of files matching optional filter.
-        """
-        dt = self._table()
-        if self.datetime is not None:
-            dt.load_with_datetime(self.datetime)
-        partition_filters = get_partition_filters(
-            dt.metadata().partition_columns, filter
-        )
-        if not partition_filters:
-            # can't filter
-            return dt.file_uris()
-        file_uris = set()
-        for filter_set in partition_filters:
-            file_uris.update(dt.file_uris(partition_filters=filter_set))
-        return sorted(list(file_uris))
-
-    def read_delta_table(self, **kwargs) -> dd.core.DataFrame:
-        """
-        Reads the list of parquet files in parallel
-        """
-        pq_files = self.get_pq_files(filter=kwargs.get("filter", None))
-        if len(pq_files) == 0:
-            raise RuntimeError("No Parquet files are available")
-
-        meta = self.meta(**kwargs.get("pyarrow_to_pandas", {}))
-
-        return dd.from_map(
-            partial(self.read_delta_dataset, **kwargs),
-            pq_files,
-            meta=meta,
-            label="read-delta-table",
-            token=tokenize(self.fs_token, **kwargs),
-        )
+    return dd.from_map(
+        partial(_read_delta_dataset, fs=fs, columns=columns, schema=schema, **kwargs),
+        pq_files,
+        meta=meta,
+        label="read-delta-table",
+        token=tokenize(fs_token, **kwargs),
+    )
 
 
 def _read_from_catalog(
@@ -258,13 +245,13 @@ def read_deltalake(
     else:
         if path is None:
             raise ValueError("Please Provide Delta Table path")
-        dtw = DeltaTableWrapper(
+        resultdf = _read_from_filesystem(
             path=path,
             version=version,
             columns=columns,
             storage_options=storage_options,
             datetime=datetime,
             delta_storage_options=delta_storage_options,
+            **kwargs,
         )
-        resultdf = dtw.read_delta_table(columns=columns, **kwargs)
     return resultdf
