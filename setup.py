@@ -11,6 +11,7 @@ setup(
     name="dask-deltatable",
     version="0.3",
     description="Dask + Delta Table ",
+    url="https://github.com/dask-contrib/dask-deltatable/",
     maintainer="rajagurunath",
     maintainer_email="gurunathrajagopal@gmail.com",
     license="BSD-3-Clause",
