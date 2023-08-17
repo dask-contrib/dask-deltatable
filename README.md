@@ -4,10 +4,16 @@ Reading and writing to Delta Lake using Dask engine.
 
 ### Installation
 
-To install the package:
+`dask-deltatable` is available on PyPI:
 
 ```
 pip install dask-deltatable
+```
+
+And conda-forge:
+
+```
+conda install -c conda-forge dask-deltatable
 ```
 
 ### Features:
