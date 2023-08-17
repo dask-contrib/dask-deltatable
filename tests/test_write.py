@@ -69,7 +69,7 @@ def test_datetime(tmpdir, unit):
     """Ensure we can write datetime with different resolutions,
     at least one-way only"""
     tmpdir = str(tmpdir)
-    ts = pd.date_range("2023-01-01", periods=10, freq="1D", unit=unit)  # type: ignore[call-arg]
+    ts = pd.date_range("2023-01-01", periods=10, freq="1D", unit=unit)
     df = pd.DataFrame({"ts": pd.Series(ts)})
     ddf = dd.from_pandas(df, npartitions=2)
     to_deltalake(tmpdir, ddf)
