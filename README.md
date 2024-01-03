@@ -39,14 +39,17 @@ conda install -c conda-forge dask-deltatable
 import dask_deltatable as ddt
 
 # read delta table
-ddt.read_deltalake("delta_path")
+df = ddt.read_deltalake("delta_path")
 
 # with specific version
-ddt.read_deltalake("delta_path", version=3)
+df = ddt.read_deltalake("delta_path", version=3)
 
 # with specific datetime
-ddt.read_deltalake("delta_path", datetime="2018-12-19T16:39:57-08:00")
+df = ddt.read_deltalake("delta_path", datetime="2018-12-19T16:39:57-08:00")
 ```
+
+`df` is a Dask DataFrame that you can work with in the same way you normally would. See [the Dask DataFrame documentation](https://docs.dask.org/en/stable/dataframe.html) for available operations.
+
 
 ### Accessing remote file systems
 
