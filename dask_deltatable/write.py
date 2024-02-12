@@ -23,11 +23,11 @@ from deltalake.writer import (
     DeltaProtocolError,
     DeltaStorageHandler,
     __enforce_append_only,
-    _write_new_deltalake,
     get_file_stats_from_metadata,
     get_partitions_from_path,
     try_get_table_and_table_uri,
 )
+from deltalake._internal import write_new_deltalake
 from toolz.itertoolz import pluck
 
 from ._schema import pyarrow_to_deltalake, validate_compatible
