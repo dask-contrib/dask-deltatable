@@ -113,7 +113,7 @@ def _read_from_filesystem(
         pq_files,
         meta=meta,
         label="read-delta-table",
-        token=tokenize(fs_token, **kwargs),
+        token=tokenize(path, fs_token, **kwargs),
     )
 
 
