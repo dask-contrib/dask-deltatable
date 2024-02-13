@@ -69,17 +69,17 @@ def _read_delta_partition(
     pyarrow_to_pandas["types_mapper"] = _get_type_mapper(
         pyarrow_to_pandas.get("types_mapper")
     )
-    return (
-        pa_ds.dataset(
-            source=filename,
-            schema=schema,
-            filesystem=fs,
-            format="parquet",
-            partitioning="hive",
-        )
-        .to_table(filter=filter_expression, columns=columns)
-        .to_pandas(**pyarrow_to_pandas)
+    pyarrow_to_pandas["ignore_metadata"] = pyarrow_to_pandas.get(
+        "ignore_metadata", False
     )
+    table = pa_ds.dataset(
+        source=filename,
+        schema=schema,
+        filesystem=fs,
+        format="parquet",
+        partitioning="hive",
+    ).to_table(filter=filter_expression, columns=columns)
+    return table.to_pandas(**pyarrow_to_pandas)
 
 
 def _read_from_filesystem(

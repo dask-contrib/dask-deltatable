@@ -47,6 +47,10 @@ def test_reader_all_primitive_types():
     expected_ddf = dd.read_parquet(
         f"{DATA_DIR}/all_primitive_types/expected/latest/table_content/*parquet"
     )
+    # Dask and delta go through different parquet parsers which read the
+    # timestamp differently. This is likely a bug in arrow but the delta result
+    # is "more correct".
+    expected_ddf["timestamp"] = expected_ddf["timestamp"].astype("datetime64[us]")
     assert_eq(actual_ddf, expected_ddf)
 
 
