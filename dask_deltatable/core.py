@@ -94,7 +94,7 @@ def _read_from_filesystem(
         table_uri=path, version=version, storage_options=delta_storage_options
     )
     if datetime is not None:
-        dt.load_with_datetime(datetime)
+        dt.load_as_version(datetime)
 
     schema = dt.schema().to_pyarrow()
 
@@ -128,6 +128,7 @@ def _read_from_catalog(
 
         session = Session()
         credentials = session.get_credentials()
+        assert credentials is not None
         current_credentials = credentials.get_frozen_credentials()
         os.environ["AWS_ACCESS_KEY_ID"] = current_credentials.access_key
         os.environ["AWS_SECRET_ACCESS_KEY"] = current_credentials.secret_key
