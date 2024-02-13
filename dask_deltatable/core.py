@@ -3,12 +3,14 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 from functools import partial
-from typing import Any, cast
+from typing import Any, Callable, cast
 
+import dask
 import dask.dataframe as dd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from dask.base import tokenize
+from dask.dataframe.io.parquet.arrow import ArrowDatasetEngine
 from dask.dataframe.utils import make_meta
 from deltalake import DataCatalog, DeltaTable
 from fsspec.core import get_fs_token_paths
@@ -64,17 +66,20 @@ def _read_delta_partition(
     filter_expression = filters_to_expression(filter) if filter else None
     if pyarrow_to_pandas is None:
         pyarrow_to_pandas = {}
-    return (
-        pa_ds.dataset(
-            source=filename,
-            schema=schema,
-            filesystem=fs,
-            format="parquet",
-            partitioning="hive",
-        )
-        .to_table(filter=filter_expression, columns=columns)
-        .to_pandas(**pyarrow_to_pandas)
+    pyarrow_to_pandas["types_mapper"] = _get_type_mapper(
+        pyarrow_to_pandas.get("types_mapper")
     )
+    pyarrow_to_pandas["ignore_metadata"] = pyarrow_to_pandas.get(
+        "ignore_metadata", False
+    )
+    table = pa_ds.dataset(
+        source=filename,
+        schema=schema,
+        filesystem=fs,
+        format="parquet",
+        partitioning="hive",
+    ).to_table(filter=filter_expression, columns=columns)
+    return table.to_pandas(**pyarrow_to_pandas)
 
 
 def _read_from_filesystem(
@@ -94,7 +99,7 @@ def _read_from_filesystem(
         table_uri=path, version=version, storage_options=delta_storage_options
     )
     if datetime is not None:
-        dt.load_with_datetime(datetime)
+        dt.load_as_version(datetime)
 
     schema = dt.schema().to_pyarrow()
 
@@ -104,6 +109,9 @@ def _read_from_filesystem(
         raise RuntimeError("No Parquet files are available")
 
     mapper_kwargs = kwargs.get("pyarrow_to_pandas", {})
+    mapper_kwargs["types_mapper"] = _get_type_mapper(
+        mapper_kwargs.get("types_mapper", None)
+    )
     meta = make_meta(schema.empty_table().to_pandas(**mapper_kwargs))
     if columns:
         meta = meta[columns]
@@ -114,6 +122,22 @@ def _read_from_filesystem(
         meta=meta,
         label="read-delta-table",
         token=tokenize(path, fs_token, **kwargs),
+    )
+
+
+def _get_type_mapper(
+    user_types_mapper: dict[str, Any] | None
+) -> Callable[[Any], Any] | None:
+    """
+    Set the type mapper for the schema
+    """
+    convert_string = dask.config.get("dataframe.convert-string", True)
+    if convert_string is None:
+        convert_string = True
+    return ArrowDatasetEngine._determine_type_mapper(
+        dtype_backend=None,
+        convert_string=convert_string,
+        arrow_to_pandas={"types_mapper": user_types_mapper},
     )
 
 
@@ -128,6 +152,7 @@ def _read_from_catalog(
 
         session = Session()
         credentials = session.get_credentials()
+        assert credentials is not None
         current_credentials = credentials.get_frozen_credentials()
         os.environ["AWS_ACCESS_KEY_ID"] = current_credentials.access_key
         os.environ["AWS_SECRET_ACCESS_KEY"] = current_credentials.secret_key

@@ -23,10 +23,10 @@ from deltalake.writer import (
     DeltaProtocolError,
     DeltaStorageHandler,
     __enforce_append_only,
-    _write_new_deltalake,
     get_file_stats_from_metadata,
     get_partitions_from_path,
     try_get_table_and_table_uri,
+    write_deltalake_pyarrow,
 )
 from toolz.itertoolz import pluck
 
@@ -54,6 +54,7 @@ def to_deltalake(
     storage_options: dict[str, str] | None = None,
     partition_filters: list[tuple[str, str, Any]] | None = None,
     compute: bool = True,
+    custom_metadata: dict[str, str] | None = None,
 ):
     """Write a given dask.DataFrame to a delta table. The returned value is a Dask Scalar,
     and the writing operation is only triggered when calling ``.compute()``
@@ -216,9 +217,10 @@ def to_deltalake(
             configuration,
             storage_options,
             partition_filters,
+            custom_metadata,
         )
     }
-    graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=(written,))
+    graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=(written,))  # type: ignore
     result = Scalar(graph, final_name, "")
     if compute:
         result = result.compute()
@@ -237,6 +239,7 @@ def _commit(
     configuration,
     storage_options,
     partition_filters,
+    custom_metadata,
 ):
     schemas = list(flatten(pluck(0, schemas_add_actions_nested)))
     add_actions = list(flatten(pluck(1, schemas_add_actions_nested)))
@@ -250,7 +253,7 @@ def _commit(
     schema = validate_compatible(schemas)
     assert schema
     if table is None:
-        _write_new_deltalake(
+        write_deltalake_pyarrow(
             table_uri,
             schema,
             add_actions,
@@ -260,6 +263,7 @@ def _commit(
             description,
             configuration,
             storage_options,
+            custom_metadata,
         )
     else:
         table._table.create_write_transaction(

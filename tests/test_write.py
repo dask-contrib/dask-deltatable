@@ -54,14 +54,11 @@ def test_roundtrip(tmpdir, with_index, freq, partition_freq):
     assert len(os.listdir(tmpdir)) > 0
 
     ddf_read = read_deltalake(tmpdir)
-    # FIXME: The index is not recovered
-    if with_index:
-        ddf = ddf.reset_index()
+    ddf_dask = dd.read_parquet(tmpdir)
 
     assert ddf.npartitions == ddf_read.npartitions
     # By default, arrow reads with ns resolution
-    ddf.timestamp = ddf.timestamp.astype("datetime64[ns]")
-    assert_eq(ddf, ddf_read)
+    assert_eq(ddf_read, ddf_dask)
 
 
 @pytest.mark.parametrize("unit", ["s", "ms", "us", "ns"])
@@ -74,5 +71,5 @@ def test_datetime(tmpdir, unit):
     ddf = dd.from_pandas(df, npartitions=2)
     to_deltalake(tmpdir, ddf)
     ddf_read = read_deltalake(tmpdir)
-    # arrow reads back with ns
-    assert ddf_read.ts.dtype == "datetime64[ns]"
+    ddf_dask = dd.read_parquet(tmpdir)
+    assert_eq(ddf_read, ddf_dask, check_index=False)
