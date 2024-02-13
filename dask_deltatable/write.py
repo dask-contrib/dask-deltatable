@@ -7,14 +7,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
+import dask
 import dask.dataframe as dd
 import dask_expr as ddx
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.fs as pa_fs
 from dask.core import flatten
-from dask.dataframe.core import make_meta
-from dask_expr._expr import Expr
 from deltalake import DeltaTable
 from deltalake.writer import (
     MAX_SUPPORTED_WRITER_VERSION,
@@ -32,49 +31,6 @@ from deltalake.writer import (
 from toolz.itertoolz import pluck
 
 from ._schema import pyarrow_to_deltalake, validate_compatible
-
-
-class DeltaTableCommit(Expr):  # type: ignore
-    _parameters = [
-        "frame",
-        "table",
-        "table_uri",
-        "schema",
-        "mode",
-        "partition_by",
-        "name",
-        "description",
-        "configuration",
-        "storage_options",
-        "partition_filters",
-        "custom_metadata",
-    ]
-
-    def _layer(self):
-        return {
-            (self._name, 0): (
-                _commit,
-                self.table,
-                self.frame.__dask_keys__(),
-                self.table_uri,
-                self.schema,
-                self.operand("mode"),
-                self.partition_by,
-                self.name,
-                self.description,
-                self.configuration,
-                self.storage_options,
-                self.partition_filters,
-                self.custom_metadata,
-            )
-        }
-
-    def _divisions(self):
-        return (None, None)
-
-    @property
-    def _meta(self):
-        return make_meta((None, object))
 
 
 def to_deltalake(
@@ -247,21 +203,19 @@ def to_deltalake(
         max_partitions=max_partitions,
         meta=(None, object),
     )
-    result = ddx.new_collection(
-        DeltaTableCommit(
-            written,
-            table,
-            table_uri,
-            schema,
-            mode,
-            partition_by,
-            name,
-            description,
-            configuration,
-            storage_options,
-            partition_filters,
-            custom_metadata,
-        )
+    result = dask.delayed(_commit, name="deltatable-commit")(
+        table,
+        written,
+        table_uri,
+        schema,
+        mode,
+        partition_by,
+        name,
+        description,
+        configuration,
+        storage_options,
+        partition_filters,
+        custom_metadata,
     )
 
     if compute:
