@@ -7,9 +7,9 @@ from typing import Any, Callable, cast
 
 import dask
 import dask.dataframe as dd
+import dask_expr as ddx
 import pyarrow as pa
 import pyarrow.parquet as pq
-from dask.base import tokenize
 from dask.dataframe.io.parquet.arrow import ArrowDatasetEngine
 from dask.dataframe.utils import make_meta
 from deltalake import DataCatalog, DeltaTable
@@ -90,7 +90,7 @@ def _read_from_filesystem(
     storage_options: dict[str, str] | None = None,
     delta_storage_options: dict[str, str] | None = None,
     **kwargs: dict[str, Any],
-) -> dd.core.DataFrame:
+) -> ddx.DataFrame:
     """
     Reads the list of parquet files in parallel
     """
@@ -116,12 +116,11 @@ def _read_from_filesystem(
     if columns:
         meta = meta[columns]
 
-    return dd.from_map(
+    return ddx.from_map(
         partial(_read_delta_partition, fs=fs, columns=columns, schema=schema, **kwargs),
         pq_files,
         meta=meta,
         label="read-delta-table",
-        token=tokenize(path, fs_token, **kwargs),
     )
 
 
