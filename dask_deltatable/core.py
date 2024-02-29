@@ -47,7 +47,7 @@ def _get_pq_files(dt: DeltaTable, filter: Filters = None) -> list[str]:
     partition_filters = get_partition_filters(dt.metadata().partition_columns, filter)
     if not partition_filters:
         # can't filter
-        return dt.file_uris()
+        return sorted(dt.file_uris())
     file_uris = set()
     for filter_set in partition_filters:
         file_uris.update(dt.file_uris(partition_filters=filter_set))
