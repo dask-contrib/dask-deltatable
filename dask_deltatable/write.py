@@ -16,7 +16,7 @@ from dask.dataframe.core import Scalar
 from dask.highlevelgraph import HighLevelGraph
 from deltalake import DeltaTable
 from deltalake.writer import (
-    MAX_SUPPORTED_WRITER_VERSION,
+    MAX_SUPPORTED_PYARROW_WRITER_VERSION,
     PYARROW_MAJOR_VERSION,
     AddAction,
     DeltaJSONEncoder,
@@ -167,11 +167,11 @@ def to_deltalake(
         else:
             partition_by = table.metadata().partition_columns
 
-        if table.protocol().min_writer_version > MAX_SUPPORTED_WRITER_VERSION:
+        if table.protocol().min_writer_version > MAX_SUPPORTED_PYARROW_WRITER_VERSION:
             raise DeltaProtocolError(
                 "This table's min_writer_version is "
                 f"{table.protocol().min_writer_version}, "
-                f"but this method only supports version {MAX_SUPPORTED_WRITER_VERSION}."
+                f"but this method only supports version {MAX_SUPPORTED_PYARROW_WRITER_VERSION}."
             )
     else:  # creating a new table
         current_version = -1
