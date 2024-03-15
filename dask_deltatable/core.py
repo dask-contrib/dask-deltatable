@@ -18,7 +18,7 @@ from packaging.version import Version
 from pyarrow import dataset as pa_ds
 
 from .types import Filters
-from .utils import get_partition_filters
+from .utils import get_partition_filters, maybe_set_aws_credentials
 
 if Version(pa.__version__) >= Version("10.0.0"):
     filters_to_expression = pq.filters_to_expression
@@ -94,6 +94,9 @@ def _read_from_filesystem(
     """
     Reads the list of parquet files in parallel
     """
+    storage_options = maybe_set_aws_credentials(path, storage_options)  # type: ignore
+    delta_storage_options = maybe_set_aws_credentials(path, delta_storage_options)  # type: ignore
+
     fs, fs_token, _ = get_fs_token_paths(path, storage_options=storage_options)
     dt = DeltaTable(
         table_uri=path, version=version, storage_options=delta_storage_options
@@ -116,12 +119,14 @@ def _read_from_filesystem(
     if columns:
         meta = meta[columns]
 
+    kws = dict(meta=meta, label="read-delta-table")
+    if not dd._dask_expr_enabled():
+        # Setting token not supported in dask-expr
+        kws["token"] = tokenize(path, fs_token, **kwargs)  # type: ignore
     return dd.from_map(
         partial(_read_delta_partition, fs=fs, columns=columns, schema=schema, **kwargs),
         pq_files,
-        meta=meta,
-        label="read-delta-table",
-        token=tokenize(path, fs_token, **kwargs),
+        **kws,
     )
 
 
@@ -270,6 +275,8 @@ def read_deltalake(
     else:
         if path is None:
             raise ValueError("Please Provide Delta Table path")
+
+        delta_storage_options = maybe_set_aws_credentials(path, delta_storage_options)  # type: ignore
         resultdf = _read_from_filesystem(
             path=path,
             version=version,
