@@ -17,8 +17,8 @@ from fsspec.core import get_fs_token_paths
 from packaging.version import Version
 from pyarrow import dataset as pa_ds
 
+from . import utils
 from .types import Filters
-from .utils import get_partition_filters, maybe_set_aws_credentials
 
 if Version(pa.__version__) >= Version("10.0.0"):
     filters_to_expression = pq.filters_to_expression
@@ -44,7 +44,9 @@ def _get_pq_files(dt: DeltaTable, filter: Filters = None) -> list[str]:
     list[str]
         List of files matching optional filter.
     """
-    partition_filters = get_partition_filters(dt.metadata().partition_columns, filter)
+    partition_filters = utils.get_partition_filters(
+        dt.metadata().partition_columns, filter
+    )
     if not partition_filters:
         # can't filter
         return sorted(dt.file_uris())
@@ -94,8 +96,8 @@ def _read_from_filesystem(
     """
     Reads the list of parquet files in parallel
     """
-    storage_options = maybe_set_aws_credentials(path, storage_options)  # type: ignore
-    delta_storage_options = maybe_set_aws_credentials(path, delta_storage_options)  # type: ignore
+    storage_options = utils.maybe_set_aws_credentials(path, storage_options)  # type: ignore
+    delta_storage_options = utils.maybe_set_aws_credentials(path, delta_storage_options)  # type: ignore
 
     fs, fs_token, _ = get_fs_token_paths(path, storage_options=storage_options)
     dt = DeltaTable(
@@ -276,7 +278,7 @@ def read_deltalake(
         if path is None:
             raise ValueError("Please Provide Delta Table path")
 
-        delta_storage_options = maybe_set_aws_credentials(path, delta_storage_options)  # type: ignore
+        delta_storage_options = utils.maybe_set_aws_credentials(path, delta_storage_options)  # type: ignore
         resultdf = _read_from_filesystem(
             path=path,
             version=version,

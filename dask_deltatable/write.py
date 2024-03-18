@@ -37,8 +37,8 @@ from deltalake.writer import (
 )
 from toolz.itertoolz import pluck
 
+from . import utils
 from ._schema import pyarrow_to_deltalake, validate_compatible
-from .utils import maybe_set_aws_credentials
 
 
 def to_deltalake(
@@ -131,7 +131,7 @@ def to_deltalake(
     -------
     dask.Scalar
     """
-    storage_options = maybe_set_aws_credentials(table_or_uri, storage_options)  # type: ignore
+    storage_options = utils.maybe_set_aws_credentials(table_or_uri, storage_options)  # type: ignore
     table, table_uri = try_get_table_and_table_uri(table_or_uri, storage_options)
 
     # We need to write against the latest table version
@@ -145,7 +145,7 @@ def to_deltalake(
             storage_options = table._storage_options or {}
             storage_options.update(storage_options or {})
 
-        storage_options = maybe_set_aws_credentials(table_uri, storage_options)
+        storage_options = utils.maybe_set_aws_credentials(table_uri, storage_options)
         filesystem = pa_fs.PyFileSystem(DeltaStorageHandler(table_uri, storage_options))
 
     if isinstance(partition_by, str):
@@ -263,7 +263,7 @@ def _commit(
     schema = validate_compatible(schemas)
     assert schema
     if table is None:
-        storage_options = maybe_set_aws_credentials(table_uri, storage_options)
+        storage_options = utils.maybe_set_aws_credentials(table_uri, storage_options)
         write_deltalake_pyarrow(
             table_uri,
             schema,
