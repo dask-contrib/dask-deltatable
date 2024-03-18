@@ -40,7 +40,6 @@ def test_partition_filters(cols, filters, expected):
         assert res == expected
 
 
-@mock.patch("boto3.session.Session")
 @mock.patch("dask_deltatable.utils.get_bucket_region")
 @pytest.mark.parametrize(
     "options",
@@ -54,10 +53,13 @@ def test_partition_filters(cols, filters, expected):
 @pytest.mark.parametrize("path", ("s3://path", "/another/path", pathlib.Path(".")))
 def test_maybe_set_aws_credentials(
     mocked_get_bucket_region,
-    mocked_session,
     options,
     path,
 ):
+    pytest.importorskip("boto3")
+
+    mocked_get_bucket_region.return_value = "foo-region"
+
     mock_creds = mock.MagicMock()
     type(mock_creds).token = mock.PropertyMock(return_value="token")
     type(mock_creds).access_key = mock.PropertyMock(return_value="access-key")
@@ -66,12 +68,11 @@ def test_maybe_set_aws_credentials(
     def mock_get_credentials():
         return mock_creds
 
-    session = mocked_session.return_value
-    session.get_credentials.side_effect = mock_get_credentials
+    with mock.patch("boto3.session.Session") as mocked_session:
+        session = mocked_session.return_value
+        session.get_credentials.side_effect = mock_get_credentials
 
-    mocked_get_bucket_region.return_value = "foo-region"
-
-    opts = maybe_set_aws_credentials(path, options)
+        opts = maybe_set_aws_credentials(path, options)
 
     if options and not any(k in options for k in ("AWS_ACCESS_KEY_ID", "access_key")):
         assert opts["AWS_ACCESS_KEY_ID"] == "access-key"
@@ -89,22 +90,24 @@ def test_maybe_set_aws_credentials(
         assert options == opts
 
 
-@mock.patch("boto3.client")
 @pytest.mark.parametrize("location", (None, "region-foo"))
 @pytest.mark.parametrize(
     "path,bucket",
     (("s3://foo/bar", "foo"), ("s3://fizzbuzz", "fizzbuzz"), ("/not/s3", None)),
 )
-def test_get_bucket_region(mock_client, location, path, bucket):
-    mock_client = mock_client.return_value
-    mock_client.get_bucket_location.return_value = {"LocationConstraint": location}
+def test_get_bucket_region(location, path, bucket):
+    pytest.importorskip("boto3")
 
-    if not path.startswith("s3://"):
-        with pytest.raises(ValueError, match="is not an S3 path"):
-            get_bucket_region(path)
-        return
+    with mock.patch("boto3.client") as mock_client:
+        mock_client = mock_client.return_value
+        mock_client.get_bucket_location.return_value = {"LocationConstraint": location}
 
-    region = get_bucket_region(path)
+        if not path.startswith("s3://"):
+            with pytest.raises(ValueError, match="is not an S3 path"):
+                get_bucket_region(path)
+            return
+
+        region = get_bucket_region(path)
 
     # AWS returns None if bucket located in us-east-1...
     location = location if location else "us-east-1"
