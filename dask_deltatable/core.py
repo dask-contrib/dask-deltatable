@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
-from functools import partial
 from typing import Any, Callable, cast
 
 import dask
 import dask.dataframe as dd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from dask.base import tokenize
 from dask.dataframe.io.parquet.arrow import ArrowDatasetEngine
 from dask.dataframe.utils import make_meta
 from deltalake import DataCatalog, DeltaTable
@@ -117,11 +115,14 @@ def _read_from_filesystem(
         meta = meta[columns]
 
     return dd.from_map(
-        partial(_read_delta_partition, fs=fs, columns=columns, schema=schema, **kwargs),
+        _read_delta_partition,
         pq_files,
         meta=meta,
         label="read-delta-table",
-        token=tokenize(path, fs_token, **kwargs),  # type: ignore
+        fs=fs,
+        columns=columns,
+        schema=schema,
+        **kwargs,
     )
 
 
