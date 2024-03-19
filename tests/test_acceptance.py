@@ -51,6 +51,7 @@ def test_reader_all_primitive_types():
     # timestamp differently. This is likely a bug in arrow but the delta result
     # is "more correct".
     expected_ddf["timestamp"] = expected_ddf["timestamp"].astype("datetime64[us]")
+    expected_ddf["timestamp"] = expected_ddf["timestamp"].dt.tz_localize("UTC")
     assert_eq(actual_ddf, expected_ddf)
 
 
