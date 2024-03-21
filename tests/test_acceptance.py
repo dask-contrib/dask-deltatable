@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import unittest.mock as mock
 from urllib.request import urlretrieve
 
 import dask.dataframe as dd
@@ -42,6 +43,15 @@ def download_data():
         assert os.path.exists(DATA_DIR)
 
 
+@mock.patch("dask_deltatable.utils.maybe_set_aws_credentials")
+def test_reader_check_aws_credentials(maybe_set_aws_credentials):
+    # The full functionality of maybe_set_aws_credentials tests in test_utils
+    # we only need to ensure it's called here when reading with a str path
+    maybe_set_aws_credentials.return_value = dict()
+    ddt.read_deltalake(f"{DATA_DIR}/all_primitive_types/delta")
+    maybe_set_aws_credentials.assert_called()
+
+
 def test_reader_all_primitive_types():
     actual_ddf = ddt.read_deltalake(f"{DATA_DIR}/all_primitive_types/delta")
     expected_ddf = dd.read_parquet(
@@ -50,7 +60,9 @@ def test_reader_all_primitive_types():
     # Dask and delta go through different parquet parsers which read the
     # timestamp differently. This is likely a bug in arrow but the delta result
     # is "more correct".
-    expected_ddf["timestamp"] = expected_ddf["timestamp"].astype("datetime64[us]")
+    expected_ddf["timestamp"] = (
+        expected_ddf["timestamp"].astype("datetime64[us]").dt.tz_localize("UTC")
+    )
     assert_eq(actual_ddf, expected_ddf)
 
 
