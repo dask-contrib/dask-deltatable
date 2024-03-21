@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import unittest.mock as mock
 from urllib.request import urlretrieve
 
 import dask.dataframe as dd
@@ -40,6 +41,15 @@ def download_data():
         shutil.unpack_archive(dest_filename, ROOT_DIR)
         os.remove(dest_filename)
         assert os.path.exists(DATA_DIR)
+
+
+@mock.patch("dask_deltatable.utils.maybe_set_aws_credentials")
+def test_reader_check_aws_credentials(maybe_set_aws_credentials):
+    # The full functionality of maybe_set_aws_credentials tests in test_utils
+    # we only need to ensure it's called here when reading with a str path
+    maybe_set_aws_credentials.return_value = dict()
+    ddt.read_deltalake(f"{DATA_DIR}/all_primitive_types/delta")
+    maybe_set_aws_credentials.assert_called()
 
 
 def test_reader_all_primitive_types():
