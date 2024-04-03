@@ -8,6 +8,7 @@ import dask
 import dask.dataframe as dd
 import pyarrow as pa
 import pyarrow.parquet as pq
+from dask.base import tokenize
 from dask.dataframe.io.parquet.arrow import ArrowDatasetEngine
 from dask.dataframe.utils import make_meta
 from deltalake import DataCatalog, DeltaTable
@@ -15,8 +16,8 @@ from fsspec.core import get_fs_token_paths
 from packaging.version import Version
 from pyarrow import dataset as pa_ds
 
+from . import utils
 from .types import Filters
-from .utils import get_partition_filters
 
 if Version(pa.__version__) >= Version("10.0.0"):
     filters_to_expression = pq.filters_to_expression
@@ -42,7 +43,9 @@ def _get_pq_files(dt: DeltaTable, filter: Filters = None) -> list[str]:
     list[str]
         List of files matching optional filter.
     """
-    partition_filters = get_partition_filters(dt.metadata().partition_columns, filter)
+    partition_filters = utils.get_partition_filters(
+        dt.metadata().partition_columns, filter
+    )
     if not partition_filters:
         # can't filter
         return sorted(dt.file_uris())
@@ -92,6 +95,9 @@ def _read_from_filesystem(
     """
     Reads the list of parquet files in parallel
     """
+    storage_options = utils.maybe_set_aws_credentials(path, storage_options)  # type: ignore
+    delta_storage_options = utils.maybe_set_aws_credentials(path, delta_storage_options)  # type: ignore
+
     fs, fs_token, _ = get_fs_token_paths(path, storage_options=storage_options)
     dt = DeltaTable(
         table_uri=path, version=version, storage_options=delta_storage_options
@@ -114,14 +120,17 @@ def _read_from_filesystem(
     if columns:
         meta = meta[columns]
 
+    if not dd._dask_expr_enabled():
+        # Setting token not supported in dask-expr
+        kwargs["token"] = tokenize(path, fs_token, **kwargs)  # type: ignore
     return dd.from_map(
         _read_delta_partition,
         pq_files,
-        meta=meta,
-        label="read-delta-table",
         fs=fs,
         columns=columns,
         schema=schema,
+        meta=meta,
+        label="read-delta-table",
         **kwargs,
     )
 
@@ -271,6 +280,8 @@ def read_deltalake(
     else:
         if path is None:
             raise ValueError("Please Provide Delta Table path")
+
+        delta_storage_options = utils.maybe_set_aws_credentials(path, delta_storage_options)  # type: ignore
         resultdf = _read_from_filesystem(
             path=path,
             version=version,
