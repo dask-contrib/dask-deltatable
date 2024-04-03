@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
-from functools import partial
 from typing import Any, Callable, cast
 
 import dask
@@ -121,14 +120,18 @@ def _read_from_filesystem(
     if columns:
         meta = meta[columns]
 
-    kws = dict(meta=meta, label="read-delta-table")
     if not dd._dask_expr_enabled():
         # Setting token not supported in dask-expr
-        kws["token"] = tokenize(path, fs_token, **kwargs)  # type: ignore
+        kwargs["token"] = tokenize(path, fs_token, **kwargs)  # type: ignore
     return dd.from_map(
-        partial(_read_delta_partition, fs=fs, columns=columns, schema=schema, **kwargs),
+        _read_delta_partition,
         pq_files,
-        **kws,
+        fs=fs,
+        columns=columns,
+        schema=schema,
+        meta=meta,
+        label="read-delta-table",
+        **kwargs,
     )
 
 

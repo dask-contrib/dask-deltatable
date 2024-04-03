@@ -32,7 +32,7 @@ repos:
           # Type stubs
           - boto3-stubs
           - dask
-          - deltalake
+          - deltalake>=0.16
           - pandas-stubs
           - pytest
           - types-setuptools
