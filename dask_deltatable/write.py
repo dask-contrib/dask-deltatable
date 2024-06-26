@@ -7,13 +7,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
+import dask
 import dask.dataframe as dd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.fs as pa_fs
 from dask.core import flatten
-from dask.dataframe.core import Scalar
-from dask.highlevelgraph import HighLevelGraph
 from deltalake import DeltaTable
 
 try:
@@ -31,6 +30,7 @@ from deltalake.writer import (
     DeltaStorageHandler,
     __enforce_append_only,
     get_file_stats_from_metadata,
+    get_num_idx_cols_and_stats_columns,
     get_partitions_from_path,
     try_get_table_and_table_uri,
     write_deltalake_pyarrow,
@@ -197,7 +197,6 @@ def to_deltalake(
     if mode == "overwrite":
         # FIXME: There are a couple of checks that are not migrated yet
         raise NotImplementedError("mode='overwrite' is not implemented")
-
     written = df.map_partitions(
         _write_partition,
         schema=schema,
@@ -211,27 +210,24 @@ def to_deltalake(
         filesystem=filesystem,
         max_partitions=max_partitions,
         meta=(None, object),
+        table=table,
+        configuration=configuration,
     )
-    final_name = "delta-commit"
-    dsk = {
-        (final_name, 0): (
-            _commit,
-            table,
-            written.__dask_keys__(),
-            table_uri,
-            schema,
-            mode,
-            partition_by,
-            name,
-            description,
-            configuration,
-            storage_options,
-            partition_filters,
-            custom_metadata,
-        )
-    }
-    graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=(written,))  # type: ignore
-    result = Scalar(graph, final_name, "")
+    result = dask.delayed(_commit, name="deltatable-commit")(
+        table,
+        written,
+        table_uri,
+        schema,
+        mode,
+        partition_by,
+        name,
+        description,
+        configuration,
+        storage_options,
+        partition_filters,
+        custom_metadata,
+    )
+
     if compute:
         result = result.compute()
     return result
@@ -258,7 +254,7 @@ def _commit(
     if schema:
         schemas.append(schema)
 
-    # TODO: This is applying a potentially stricted schema control than what
+    # TODO: This is applying a potentially stricter schema control than what
     # Delta requires but if this passes, it should be good to go
     schema = validate_compatible(schemas)
     assert schema
@@ -300,6 +296,8 @@ def _write_partition(
     max_rows_per_group,
     filesystem,
     max_partitions,
+    table,
+    configuration,
 ) -> tuple[pa.Schema, list[AddAction]]:
     if schema is None:
         #
@@ -309,8 +307,13 @@ def _write_partition(
     add_actions: list[AddAction] = []
 
     def visitor(written_file: Any) -> None:
+        num_indexed_cols, stats_cols = get_num_idx_cols_and_stats_columns(
+            table._table if table is not None else None, configuration
+        )
         path, partition_values = get_partitions_from_path(written_file.path)
-        stats = get_file_stats_from_metadata(written_file.metadata)
+        stats = get_file_stats_from_metadata(
+            written_file.metadata, num_indexed_cols, stats_cols
+        )
 
         # PyArrow added support for written_file.size in 9.0.0
         if PYARROW_MAJOR_VERSION >= 9:
