@@ -30,6 +30,7 @@ from deltalake.writer import (
     DeltaStorageHandler,
     __enforce_append_only,
     get_file_stats_from_metadata,
+    get_num_idx_cols_and_stats_columns,
     get_partitions_from_path,
     try_get_table_and_table_uri,
     write_deltalake_pyarrow,
@@ -209,6 +210,8 @@ def to_deltalake(
         filesystem=filesystem,
         max_partitions=max_partitions,
         meta=(None, object),
+        table=table,
+        configuration=configuration,
     )
     result = dask.delayed(_commit, name="deltatable-commit")(
         table,
@@ -293,6 +296,8 @@ def _write_partition(
     max_rows_per_group,
     filesystem,
     max_partitions,
+    table,
+    configuration,
 ) -> tuple[pa.Schema, list[AddAction]]:
     if schema is None:
         #
@@ -302,8 +307,13 @@ def _write_partition(
     add_actions: list[AddAction] = []
 
     def visitor(written_file: Any) -> None:
+        num_indexed_cols, stats_cols = get_num_idx_cols_and_stats_columns(
+            table._table if table is not None else None, configuration
+        )
         path, partition_values = get_partitions_from_path(written_file.path)
-        stats = get_file_stats_from_metadata(written_file.metadata)
+        stats = get_file_stats_from_metadata(
+            written_file.metadata, num_indexed_cols, stats_cols
+        )
 
         # PyArrow added support for written_file.size in 9.0.0
         if PYARROW_MAJOR_VERSION >= 9:
