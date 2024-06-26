@@ -1,4 +1,4 @@
 dask[dataframe]>=2024.03.0
-deltalake>=0.15
+deltalake>=0.16
 fsspec
 pyarrow

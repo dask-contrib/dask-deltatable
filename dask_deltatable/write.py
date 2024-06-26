@@ -14,8 +14,15 @@ import pyarrow.dataset as ds
 import pyarrow.fs as pa_fs
 from dask.core import flatten
 from deltalake import DeltaTable
+
+try:
+    from deltalake.writer import MAX_SUPPORTED_PYARROW_WRITER_VERSION
+except ImportError:
+    from deltalake.writer import (  # type: ignore
+        MAX_SUPPORTED_WRITER_VERSION as MAX_SUPPORTED_PYARROW_WRITER_VERSION,
+    )
+
 from deltalake.writer import (
-    MAX_SUPPORTED_WRITER_VERSION,
     PYARROW_MAJOR_VERSION,
     AddAction,
     DeltaJSONEncoder,
@@ -29,6 +36,7 @@ from deltalake.writer import (
 )
 from toolz.itertoolz import pluck
 
+from . import utils
 from ._schema import pyarrow_to_deltalake, validate_compatible
 
 
@@ -122,6 +130,7 @@ def to_deltalake(
     -------
     dask.Scalar
     """
+    storage_options = utils.maybe_set_aws_credentials(table_or_uri, storage_options)  # type: ignore
     table, table_uri = try_get_table_and_table_uri(table_or_uri, storage_options)
 
     # We need to write against the latest table version
@@ -135,6 +144,7 @@ def to_deltalake(
             storage_options = table._storage_options or {}
             storage_options.update(storage_options or {})
 
+        storage_options = utils.maybe_set_aws_credentials(table_uri, storage_options)
         filesystem = pa_fs.PyFileSystem(DeltaStorageHandler(table_uri, storage_options))
 
     if isinstance(partition_by, str):
@@ -166,11 +176,11 @@ def to_deltalake(
         else:
             partition_by = table.metadata().partition_columns
 
-        if table.protocol().min_writer_version > MAX_SUPPORTED_WRITER_VERSION:
+        if table.protocol().min_writer_version > MAX_SUPPORTED_PYARROW_WRITER_VERSION:
             raise DeltaProtocolError(
                 "This table's min_writer_version is "
                 f"{table.protocol().min_writer_version}, "
-                f"but this method only supports version {MAX_SUPPORTED_WRITER_VERSION}."
+                f"but this method only supports version {MAX_SUPPORTED_PYARROW_WRITER_VERSION}."
             )
     else:  # creating a new table
         current_version = -1
@@ -246,6 +256,7 @@ def _commit(
     schema = validate_compatible(schemas)
     assert schema
     if table is None:
+        storage_options = utils.maybe_set_aws_credentials(table_uri, storage_options)
         write_deltalake_pyarrow(
             table_uri,
             schema,

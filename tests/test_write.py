@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import unittest.mock as mock
 
 import dask.dataframe as dd
 import pandas as pd
@@ -59,6 +60,18 @@ def test_roundtrip(tmpdir, with_index, freq, partition_freq):
     assert ddf.npartitions == ddf_read.npartitions
     # By default, arrow reads with ns resolution
     assert_eq(ddf_read, ddf_dask)
+
+
+@mock.patch("dask_deltatable.utils.maybe_set_aws_credentials")
+def test_writer_check_aws_credentials(maybe_set_aws_credentials, tmpdir):
+    # The full functionality of maybe_set_aws_credentials tests in test_utils
+    # we only need to ensure it's called here when writing with a str path
+    maybe_set_aws_credentials.return_value = dict()
+
+    df = pd.DataFrame({"col1": range(10)})
+    ddf = dd.from_pandas(df, npartitions=2)
+    to_deltalake(str(tmpdir), ddf)
+    maybe_set_aws_credentials.assert_called()
 
 
 @pytest.mark.parametrize("unit", ["s", "ms", "us", "ns"])
