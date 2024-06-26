@@ -1,0 +1,9 @@
+name: test-environment
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - dask
+  - pyarrow
+  - pytest
+  - pytest-cov

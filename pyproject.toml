@@ -16,5 +16,5 @@ profile = "black"
 add_imports = ["from __future__ import annotations"]
 
 [tool.black]
-target-version = ['py38']
+target-version = ['py310']
 include = '\.pyi?$'

@@ -7,7 +7,6 @@ from typing import Any, Callable, cast
 
 import dask
 import dask.dataframe as dd
-import dask_expr as ddx
 import pyarrow as pa
 import pyarrow.parquet as pq
 from dask.dataframe.io.parquet.arrow import ArrowDatasetEngine
@@ -90,7 +89,7 @@ def _read_from_filesystem(
     storage_options: dict[str, str] | None = None,
     delta_storage_options: dict[str, str] | None = None,
     **kwargs: dict[str, Any],
-) -> ddx.DataFrame:
+) -> dd.DataFrame:
     """
     Reads the list of parquet files in parallel
     """
@@ -116,7 +115,7 @@ def _read_from_filesystem(
     if columns:
         meta = meta[columns]
 
-    return ddx.from_map(
+    return dd.from_map(
         partial(_read_delta_partition, fs=fs, columns=columns, schema=schema, **kwargs),
         pq_files,
         meta=meta,
@@ -142,7 +141,7 @@ def _get_type_mapper(
 
 def _read_from_catalog(
     database_name: str, table_name: str, **kwargs
-) -> dd.core.DataFrame:
+) -> dd.DataFrame:
     if ("AWS_ACCESS_KEY_ID" not in os.environ) and (
         "AWS_SECRET_ACCESS_KEY" not in os.environ
     ):

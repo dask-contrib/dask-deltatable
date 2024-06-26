@@ -9,7 +9,6 @@ from typing import Any, Literal
 
 import dask
 import dask.dataframe as dd
-import dask_expr as ddx
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.fs as pa_fs
@@ -187,8 +186,6 @@ def to_deltalake(
     if mode == "overwrite":
         # FIXME: There are a couple of checks that are not migrated yet
         raise NotImplementedError("mode='overwrite' is not implemented")
-    if not isinstance(df, ddx.FrameBase):
-        df = ddx.from_dask_dataframe(df)
     written = df.map_partitions(
         _write_partition,
         schema=schema,
