@@ -139,9 +139,7 @@ def _get_type_mapper(
     )
 
 
-def _read_from_catalog(
-    database_name: str, table_name: str, **kwargs
-) -> dd.DataFrame:
+def _read_from_catalog(database_name: str, table_name: str, **kwargs) -> dd.DataFrame:
     if ("AWS_ACCESS_KEY_ID" not in os.environ) and (
         "AWS_SECRET_ACCESS_KEY" not in os.environ
     ):
