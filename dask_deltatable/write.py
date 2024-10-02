@@ -18,17 +18,22 @@ from deltalake import DeltaTable
 try:
     from deltalake.writer import MAX_SUPPORTED_PYARROW_WRITER_VERSION
 except ImportError:
-    from deltalake.writer import (  # type: ignore
-        MAX_SUPPORTED_WRITER_VERSION as MAX_SUPPORTED_PYARROW_WRITER_VERSION,
-    )
+    # Black and mypy were arguing when doing this in one line, the type: ignore kept moving around
+    from deltalake.writer import MAX_SUPPORTED_WRITER_VERSION  # type: ignore
+
+    MAX_SUPPORTED_PYARROW_WRITER_VERSION = MAX_SUPPORTED_WRITER_VERSION
+    del MAX_SUPPORTED_WRITER_VERSION
+
+try:
+    from deltalake.writer import _enforce_append_only
+except ImportError:
+    from deltalake.writer import __enforce_append_only as _enforce_append_only  # type: ignore
 
 from deltalake.writer import (
-    PYARROW_MAJOR_VERSION,
     AddAction,
     DeltaJSONEncoder,
     DeltaProtocolError,
     DeltaStorageHandler,
-    __enforce_append_only,
     get_file_stats_from_metadata,
     get_num_idx_cols_and_stats_columns,
     get_partitions_from_path,
@@ -39,6 +44,8 @@ from toolz.itertoolz import pluck
 
 from . import utils
 from ._schema import pyarrow_to_deltalake, validate_compatible
+
+PYARROW_MAJOR_VERSION = int(pa.__version__.split(".")[0])
 
 
 def to_deltalake(
@@ -138,7 +145,7 @@ def to_deltalake(
     if table:
         table.update_incremental()
 
-    __enforce_append_only(table=table, configuration=configuration, mode=mode)
+    _enforce_append_only(table=table, configuration=configuration, mode=mode)
 
     if filesystem is None:
         if table is not None:

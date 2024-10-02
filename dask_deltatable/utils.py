@@ -103,6 +103,7 @@ def get_partition_filters(
 
     if isinstance(filters[0][0], str):
         filters = cast(list[list[Filter]], [filters])
+    filters = cast(list[list[Filter]], filters)
 
     allowed_ops = {
         "=": "=",
