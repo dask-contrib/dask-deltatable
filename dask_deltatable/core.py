@@ -291,3 +291,102 @@ def read_deltalake(
             **kwargs,
         )
     return resultdf
+
+def read_unity_catalog(
+    catalog_name: str,
+    database_name: str,
+    table_name: str,
+    **kwargs,
+) -> dd.DataFrame:
+    """
+    Read a Delta Table from Databricks Unity Catalog into a Dask DataFrame.
+
+    This function connects to Databricks using the WorkspaceClient and retrieves
+    temporary credentials to access the specified Unity Catalog table. It then
+    reads the Delta table's Parquet files into a Dask DataFrame.
+
+    Parameters
+    ----------
+    catalog_name : str
+        Name of the Unity Catalog catalog.
+    database_name : str
+        Name of the database within the catalog.
+    table_name : str
+        Name of the table within the database.
+    **kwargs
+        Additional keyword arguments passed to `dask.dataframe.read_parquet`.
+        Some most used parameters can be passed here are:
+        1. schema
+        2. filter
+        3. pyarrow_to_pandas
+
+        schema : pyarrow.Schema
+            Used to maintain schema evolution in deltatable.
+            delta protocol stores the schema string in the json log files which is
+            converted into pyarrow.Schema and used for schema evolution
+            i.e Based on particular version, some columns can be
+            shown or not shown.
+
+        filter: Union[List[Tuple[str, str, Any]], List[List[Tuple[str, str, Any]]]], default None
+            List of filters to apply, like ``[[('col1', '==', 0), ...], ...]``.
+            Can act as both partition as well as row based filter, above list of filters
+            converted into pyarrow.dataset.Expression built using pyarrow.dataset.Field
+            example:
+                [("x",">",400)] --> pyarrow.dataset.field("x")>400
+
+        pyarrow_to_pandas: dict
+            Options to pass directly to pyarrow.Table.to_pandas.
+            Common options include:
+            * categories: list[str]
+                List of columns to treat as pandas.Categorical
+            * strings_to_categorical: bool
+                Encode string (UTF8) and binary types to pandas.Categorical.
+            * types_mapper: Callable
+                A function mapping a pyarrow DataType to a pandas ExtensionDtype
+
+            See https://arrow.apache.org/docs/python/generated/pyarrow.Table.html#pyarrow.Table.to_pandas
+            for more.
+
+    Returns
+    -------
+    dask.dataframe.DataFrame
+        A Dask DataFrame representing the Delta table.
+
+    Notes
+    -----
+    Requires the following environment variables to be set:
+    - DATABRICKS_HOST: The Databricks workspace URL.
+    - DATABRICKS_TOKEN: A Databricks personal access token.
+
+    Example
+    -------
+    >>> ddf = read_unity_catalog("main", "my_db", "my_table")
+    """
+    from databricks.sdk import WorkspaceClient
+    from databricks.sdk.service.catalog import TableOperation
+    w = WorkspaceClient(
+        host=os.environ["DATABRICKS_HOST"],
+        token=os.environ["DATABRICKS_TOKEN"]
+    )
+    uc_full_url = f"{catalog_name}.{database_name}.{table_name}"
+    table = w.tables.get(uc_full_url)
+    temp_credentials = (
+        w.temporary_table_credentials.generate_temporary_table_credentials(
+            operation=TableOperation.READ,
+            table_id=table.table_id
+        )
+    )
+    storage_options = {
+        "sas_token": temp_credentials.azure_user_delegation_sas.sas_token
+    }
+    delta_table = DeltaTable(
+        table_uri=table.storage_location,
+        storage_options=storage_options
+    )
+    file_paths = [
+        file_path.replace("abfss://", "abfs://")
+        for file_path in delta_table.file_uris()
+    ]
+    ddf = dd.read_parquet(file_paths, **kwargs)
+    return ddf
+
