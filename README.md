@@ -75,6 +75,22 @@ Example:
 ddt.read_deltalake(catalog="glue", database_name="science", table_name="physics")
 ```
 
+### Accessing Unity catalog
+
+`dask-deltatable` can connect to Unity catalog to read the delta table.
+The method will look for `DATABRICKS_WORKSPACE_URL` and `DATABRICKS_ACCESS_TOKEN`
+environment variables.
+
+Example:
+
+```python
+ddt.read_unity_catalog(
+    catalog_name="projects",
+    database_name="science",
+    table_name="physics"
+)
+```
+
 ### Writing to Delta Lake
 
 To write a Dask dataframe to Delta Lake, use `to_deltalake` method.
