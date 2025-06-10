@@ -231,7 +231,7 @@ def read_deltalake(
         2. filter
         3. pyarrow_to_pandas
 
-        schema : pyarrow.Schema
+        schema: pyarrow.Schema
             Used to maintain schema evolution in deltatable.
             delta protocol stores the schema string in the json log files which is
             converted into pyarrow.Schema and used for schema evolution
@@ -297,7 +297,6 @@ def read_unity_catalog(
     catalog_name: str,
     database_name: str,
     table_name: str,
-    catalog_credentials: dict[str, str] | None = None,
     **kwargs,
 ) -> dd.DataFrame:
     """
@@ -315,21 +314,16 @@ def read_unity_catalog(
         Name of the database within the catalog.
     table_name : str
         Name of the table within the database.
-    catalog_credentials: dict[str, str], optional
-        key/value pair passed to the unity catalog workspace client. Can be passed as
-        environmental variabels.
-        * host: str
-            The Databricks workspace URL.
-        * token: str
-            A Databricks personal access token.
     **kwargs
         Additional keyword arguments passed to `dask.dataframe.read_parquet`.
         Some most used parameters can be passed here are:
         1. schema
         2. filter
         3. pyarrow_to_pandas
+        4. DATABRICKS_HOST
+        5. DATABRICKS_TOKEN
 
-        schema : pyarrow.Schema
+        schema: pyarrow.Schema
             Used to maintain schema evolution in deltatable.
             delta protocol stores the schema string in the json log files which is
             converted into pyarrow.Schema and used for schema evolution
@@ -356,6 +350,12 @@ def read_unity_catalog(
             See https://arrow.apache.org/docs/python/generated/pyarrow.Table.html#pyarrow.Table.to_pandas
             for more.
 
+        DATABRICKS_HOST: str
+            The Databricks workspace URL hosting the Unity Catalog.
+
+        DATABRICKS_TOKEN: str
+            A Databricks personal access token with at least read access on the catalog.
+
     Returns
     -------
     dask.dataframe.DataFrame
@@ -363,26 +363,30 @@ def read_unity_catalog(
 
     Notes
     -----
-    Requires the following to be set as either environment variables or in
-    `catalog_credentials`:
-    - DATABRICKS_HOST: The Databricks workspace URL.
-    - DATABRICKS_TOKEN: A Databricks personal access token.
+    Requires the following to be set as either environment variables or in `kwargs`:
+    - DATABRICKS_HOST: The Databricks workspace URL hosting the Unity Catalog.
+    - DATABRICKS_TOKEN: A Databricks personal access token with at least read access on
+        the catalog.
 
     Example
     -------
-    >>> ddf = read_unity_catalog("main", "my_db", "my_table")
+    >>> ddf = read_unity_catalog(
+            catalog_name="main",
+            database_name="my_db",
+            able_name="my_table",
+        )
     """
     from databricks.sdk import WorkspaceClient
     from databricks.sdk.service.catalog import TableOperation
     try:
         workspace_client = WorkspaceClient(
-            host=os.environ.get(["DATABRICKS_HOST"], catalog_credentials["host"]),
-            token=os.environ.get(["DATABRICKS_TOKEN"], catalog_credentials["token"]),
+            host=os.environ.get(["DATABRICKS_HOST"], kwargs["DATABRICKS_HOST"]),
+            token=os.environ.get(["DATABRICKS_TOKEN"], kwargs["DATABRICKS_TOKEN"]),
         )
     except KeyError:
         raise ValueError(
             "Please set `DATABRICKS_HOST` and `DATABRICKS_TOKEN` either as environment"
-            " variables or as `host` and `token` as part of catalog_credentials"
+            " variables or as part of `kwargs`"
         )
     uc_full_url = f"{catalog_name}.{database_name}.{table_name}"
     table = workspace_client.tables.get(uc_full_url)
