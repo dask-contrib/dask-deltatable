@@ -320,8 +320,8 @@ def read_unity_catalog(
         1. schema
         2. filter
         3. pyarrow_to_pandas
-        4. DATABRICKS_HOST
-        5. DATABRICKS_TOKEN
+        4. databricks_host
+        5. databricks_token
 
         schema: pyarrow.Schema
             Used to maintain schema evolution in deltatable.
@@ -350,10 +350,10 @@ def read_unity_catalog(
             See https://arrow.apache.org/docs/python/generated/pyarrow.Table.html#pyarrow.Table.to_pandas
             for more.
 
-        DATABRICKS_HOST: str
+        databricks_host: str
             The Databricks workspace URL hosting the Unity Catalog.
 
-        DATABRICKS_TOKEN: str
+        databricks_token: str
             A Databricks personal access token with at least read access on the catalog.
 
     Returns
@@ -363,7 +363,8 @@ def read_unity_catalog(
 
     Notes
     -----
-    Requires the following to be set as either environment variables or in `kwargs`:
+    Requires the following to be set as either environment variables or in `kwargs` as
+    lower case:
     - DATABRICKS_HOST: The Databricks workspace URL hosting the Unity Catalog.
     - DATABRICKS_TOKEN: A Databricks personal access token with at least read access on
         the catalog.
@@ -380,13 +381,13 @@ def read_unity_catalog(
     from databricks.sdk.service.catalog import TableOperation
     try:
         workspace_client = WorkspaceClient(
-            host=os.environ.get(["DATABRICKS_HOST"], kwargs["DATABRICKS_HOST"]),
-            token=os.environ.get(["DATABRICKS_TOKEN"], kwargs["DATABRICKS_TOKEN"]),
+            host=os.environ.get(["DATABRICKS_HOST"], kwargs["databricks_host"]),
+            token=os.environ.get(["DATABRICKS_TOKEN"], kwargs["databricks_token"]),
         )
     except KeyError:
         raise ValueError(
             "Please set `DATABRICKS_HOST` and `DATABRICKS_TOKEN` either as environment"
-            " variables or as part of `kwargs`"
+            " variables or as part of `kwargs` with lowercase"
         )
     uc_full_url = f"{catalog_name}.{database_name}.{table_name}"
     table = workspace_client.tables.get(uc_full_url)

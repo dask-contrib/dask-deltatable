@@ -80,8 +80,8 @@ ddt.read_deltalake(catalog="glue", database_name="science", table_name="physics"
 ### Accessing Unity catalog
 
 `dask-deltatable` can connect to Unity catalog to read the delta table.
-The method will look for `DATABRICKS_HOST` and `DATABRICKS_TOKEN` environment variables
-or as `kwargs` arguments with the same name.
+The method will look for `DATABRICKS_HOST` and `DATABRICKS_TOKEN` environment
+variables or try to find them as `kwargs` with the same name but lowercase.
 
 Example:
 
