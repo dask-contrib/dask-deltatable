@@ -109,8 +109,6 @@ def _read_from_filesystem(
 
     filter_value = cast(Filters, kwargs.get("filter", None))
     pq_files = _get_pq_files(dt, filter=filter_value)
-    if len(pq_files) == 0:
-        raise RuntimeError("No Parquet files are available")
 
     mapper_kwargs = kwargs.get("pyarrow_to_pandas", {})
     mapper_kwargs["types_mapper"] = _get_type_mapper(
@@ -124,16 +122,22 @@ def _read_from_filesystem(
         # Setting token not supported in dask-expr
         kwargs["token"] = tokenize(path, fs_token, **kwargs)  # type: ignore
 
-    return dd.from_map(
-        _read_delta_partition,
-        pq_files,
-        fs=fs,
-        columns=columns,
-        schema=schema,
-        meta=meta,
-        label="read-delta-table",
-        **kwargs,
-    )
+    if len(pq_files) == 0:
+        df = schema.empty_table().to_pandas()
+        if columns is not None:
+            df = df[columns]
+        return dd.from_pandas(df, npartitions=1)
+    else:
+        return dd.from_map(
+            _read_delta_partition,
+            pq_files,
+            fs=fs,
+            columns=columns,
+            schema=schema,
+            meta=meta,
+            label="read-delta-table",
+            **kwargs,
+        )
 
 
 def _get_type_mapper(
