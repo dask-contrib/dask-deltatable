@@ -111,10 +111,10 @@ def test_empty(empty_table1, empty_table2):
     df = ddt.read_deltalake(empty_table2)
     assert df.compute().shape == (0, 4)
 
-    df = ddt.read_deltalake(empty_table2, columns = ["some_struct", "value"])
+    df = ddt.read_deltalake(empty_table2, columns=["some_struct", "value"])
     assert df.compute().shape == (0, 2)
 
-    df = ddt.read_deltalake(empty_table2, columns = [])
+    df = ddt.read_deltalake(empty_table2, columns=[])
     assert df.compute().shape == (0, 0)
 
 
