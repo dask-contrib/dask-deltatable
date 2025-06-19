@@ -249,6 +249,25 @@ class DeltaJSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+# Copied from delta-rs v0.25.5 (https://github.com/delta-io/delta-rs/blob/python-v0.25.5/LICENSE.txt)
+def _enforce_append_only(
+    table: DeltaTable | None,
+    configuration: Mapping[str, str | None] | None,
+    mode: str,
+) -> None:
+    """Throw ValueError if table configuration contains delta.appendOnly and mode is not append"""
+    if table:
+        configuration = table.metadata().configuration
+    config_delta_append_only = (
+        configuration and configuration.get("delta.appendOnly", "false") == "true"
+    )
+    if config_delta_append_only and mode != "append":
+        raise ValueError(
+            "If configuration has delta.appendOnly = 'true', mode must be 'append'."
+            f" Mode is currently {mode}"
+        )
+
+
 # Inspired from delta-rs v0.25.5 (https://github.com/delta-io/delta-rs/blob/python-v0.25.5/LICENSE.txt)
 def get_num_idx_cols_and_stats_columns(
     table: DeltaTable | None, configuration: Mapping[str, str | None] | None

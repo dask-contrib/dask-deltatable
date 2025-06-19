@@ -134,7 +134,7 @@ def to_deltalake(
     if table:
         table.update_incremental()
 
-    # _enforce_append_only(table=table, configuration=configuration, mode=mode)
+    utils._enforce_append_only(table=table, configuration=configuration, mode=mode)
 
     if filesystem is None:
         if table is not None:
