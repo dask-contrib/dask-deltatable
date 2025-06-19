@@ -6,12 +6,13 @@ from typing import Any, Callable, cast
 
 import dask
 import dask.dataframe as dd
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from dask.base import tokenize
 from dask.dataframe.io.parquet.arrow import ArrowDatasetEngine
 from dask.dataframe.utils import make_meta
-from deltalake import DataCatalog, DeltaTable
+from deltalake import DeltaTable
 from fsspec.core import get_fs_token_paths
 from packaging.version import Version
 from pyarrow import dataset as pa_ds
@@ -105,7 +106,7 @@ def _read_from_filesystem(
     if datetime is not None:
         dt.load_as_version(datetime)
 
-    schema = dt.schema().to_pyarrow()
+    schema = pa.schema(dt.schema().to_arrow())
 
     filter_value = cast(Filters, kwargs.get("filter", None))
     pq_files = _get_pq_files(dt, filter=filter_value)
@@ -116,7 +117,7 @@ def _read_from_filesystem(
     mapper_kwargs["types_mapper"] = _get_type_mapper(
         mapper_kwargs.get("types_mapper", None)
     )
-    meta = make_meta(schema.empty_table().to_pandas(**mapper_kwargs))
+    meta = make_meta(pa.table(schema.empty_table()).to_pandas(**mapper_kwargs))
     if columns:
         meta = meta[columns]
 
@@ -152,26 +153,26 @@ def _get_type_mapper(
     )
 
 
-def _read_from_catalog(database_name: str, table_name: str, **kwargs) -> dd.DataFrame:
-    if ("AWS_ACCESS_KEY_ID" not in os.environ) and (
-        "AWS_SECRET_ACCESS_KEY" not in os.environ
-    ):
-        # defer's installing boto3 upfront !
-        from boto3 import Session
+# def _read_from_catalog(database_name: str, table_name: str, **kwargs) -> dd.DataFrame:
+#     if ("AWS_ACCESS_KEY_ID" not in os.environ) and (
+#         "AWS_SECRET_ACCESS_KEY" not in os.environ
+#     ):
+#         # defer's installing boto3 upfront !
+#         from boto3 import Session
 
-        session = Session()
-        credentials = session.get_credentials()
-        assert credentials is not None
-        current_credentials = credentials.get_frozen_credentials()
-        os.environ["AWS_ACCESS_KEY_ID"] = current_credentials.access_key
-        os.environ["AWS_SECRET_ACCESS_KEY"] = current_credentials.secret_key
-    data_catalog = DataCatalog.AWS
-    dt = DeltaTable.from_data_catalog(
-        data_catalog=data_catalog, database_name=database_name, table_name=table_name
-    )
+#         session = Session()
+#         credentials = session.get_credentials()
+#         assert credentials is not None
+#         current_credentials = credentials.get_frozen_credentials()
+#         os.environ["AWS_ACCESS_KEY_ID"] = current_credentials.access_key
+#         os.environ["AWS_SECRET_ACCESS_KEY"] = current_credentials.secret_key
+#     data_catalog = DataCatalog.AWS
+#     dt = DeltaTable.from_data_catalog(
+#         data_catalog=data_catalog, database_name=database_name, table_name=table_name
+#     )
 
-    df = dd.read_parquet(dt.file_uris(), **kwargs)
-    return df
+#     df = dd.read_parquet(dt.file_uris(), **kwargs)
+#     return df
 
 
 def read_deltalake(
@@ -273,8 +274,11 @@ def read_deltalake(
                 "Since Catalog was provided, please provide Database and table name"
             )
         else:
-            resultdf = _read_from_catalog(
-                database_name=database_name, table_name=table_name, **kwargs
+            # resultdf = _read_from_catalog(
+            #     database_name=database_name, table_name=table_name, **kwargs
+            # )
+            raise NotImplementedError(
+                "Reading from catalog is not implemented yet, please use path"
             )
     else:
         if path is None:

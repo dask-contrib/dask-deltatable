@@ -13,33 +13,22 @@ import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.fs as pa_fs
 from dask.core import flatten
-from deltalake import DeltaTable
+from deltalake import CommitProperties, DeltaTable
+from deltalake import Schema as DeltaSchema
 
 try:
-    from deltalake.writer import MAX_SUPPORTED_PYARROW_WRITER_VERSION
+    from deltalake.table import MAX_SUPPORTED_PYARROW_WRITER_VERSION
 except ImportError:
     # Black and mypy were arguing when doing this in one line, the type: ignore kept moving around
-    from deltalake.writer import MAX_SUPPORTED_WRITER_VERSION  # type: ignore
+    from deltalake.table import MAX_SUPPORTED_WRITER_VERSION  # type: ignore
 
     MAX_SUPPORTED_PYARROW_WRITER_VERSION = MAX_SUPPORTED_WRITER_VERSION
     del MAX_SUPPORTED_WRITER_VERSION
 
-try:
-    from deltalake.writer import _enforce_append_only
-except ImportError:
-    from deltalake.writer import __enforce_append_only as _enforce_append_only  # type: ignore
-
-from deltalake.writer import (
-    AddAction,
-    DeltaJSONEncoder,
-    DeltaProtocolError,
-    DeltaStorageHandler,
-    get_file_stats_from_metadata,
-    get_num_idx_cols_and_stats_columns,
-    get_partitions_from_path,
-    try_get_table_and_table_uri,
-    write_deltalake_pyarrow,
-)
+from deltalake.exceptions import DeltaProtocolError
+from deltalake.fs import DeltaStorageHandler
+from deltalake.transaction import AddAction, create_table_with_add_actions
+from deltalake.writer.writer import try_get_table_and_table_uri
 from toolz.itertoolz import pluck
 
 from . import utils
@@ -145,7 +134,7 @@ def to_deltalake(
     if table:
         table.update_incremental()
 
-    _enforce_append_only(table=table, configuration=configuration, mode=mode)
+    # _enforce_append_only(table=table, configuration=configuration, mode=mode)
 
     if filesystem is None:
         if table is not None:
@@ -164,12 +153,12 @@ def to_deltalake(
     if table:  # already exists
         if (
             schema is not None
-            and schema != table.schema().to_pyarrow()
+            and schema != table.schema().to_arrow()
             and not (mode == "overwrite" and overwrite_schema)
         ):
             raise ValueError(
                 "Schema of data does not match table schema\n"
-                f"Table schema:\n{schema}\nData Schema:\n{table.schema().to_pyarrow()}"
+                f"Table schema:\n{schema}\nData Schema:\n{table.schema().to_arrow()}"
             )
 
         if mode == "error":
@@ -265,11 +254,13 @@ def _commit(
     # Delta requires but if this passes, it should be good to go
     schema = validate_compatible(schemas)
     assert schema
+    delta_schema = DeltaSchema.from_arrow(schema)
+    commit_properties = CommitProperties(custom_metadata=custom_metadata)
     if table is None:
         storage_options = utils.maybe_set_aws_credentials(table_uri, storage_options)
-        write_deltalake_pyarrow(
+        create_table_with_add_actions(
             table_uri,
-            schema,
+            delta_schema,
             add_actions,
             mode,
             partition_by or [],
@@ -277,14 +268,14 @@ def _commit(
             description,
             configuration,
             storage_options,
-            custom_metadata,
+            commit_properties,
         )
     else:
         table._table.create_write_transaction(
             add_actions,
             mode,
             partition_by or [],
-            schema,
+            delta_schema,
             partition_filters,
         )
         table.update_incremental()
@@ -314,11 +305,11 @@ def _write_partition(
     add_actions: list[AddAction] = []
 
     def visitor(written_file: Any) -> None:
-        num_indexed_cols, stats_cols = get_num_idx_cols_and_stats_columns(
-            table._table if table is not None else None, configuration
+        num_indexed_cols, stats_cols = utils.get_num_idx_cols_and_stats_columns(
+            table if table is not None else None, configuration
         )
-        path, partition_values = get_partitions_from_path(written_file.path)
-        stats = get_file_stats_from_metadata(
+        path, partition_values = utils.get_partitions_from_path(written_file.path)
+        stats = utils.get_file_stats_from_metadata(
             written_file.metadata, num_indexed_cols, stats_cols
         )
 
@@ -335,7 +326,7 @@ def _write_partition(
                 partition_values,
                 int(datetime.now().timestamp() * 1000),
                 True,
-                json.dumps(stats, cls=DeltaJSONEncoder),
+                json.dumps(stats, cls=utils.DeltaJSONEncoder),
             )
         )
 

@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator, Mapping
+from datetime import date, datetime
+from decimal import Decimal
+from math import inf
 from typing import Any, cast
+from urllib.parse import unquote
+
+from deltalake import DeltaTable
 
 from .types import Filter, Filters
 
@@ -131,3 +139,143 @@ def get_partition_filters(
             return None
 
     return expressions if expressions else None
+
+
+# Copied from delta-rs v0.25.5 (https://github.com/delta-io/delta-rs/blob/python-v0.25.5/LICENSE.txt)
+def get_partitions_from_path(path: str) -> tuple[str, dict[str, str | None]]:
+    if path[0] == "/":
+        path = path[1:]
+    parts = path.split("/")
+    parts.pop()  # remove filename
+    out: dict[str, str | None] = {}
+    for part in parts:
+        if part == "":
+            continue
+        key, value = part.split("=", maxsplit=1)
+        if value == "__HIVE_DEFAULT_PARTITION__":
+            out[key] = None
+        else:
+            out[key] = unquote(value)
+    return path, out
+
+
+# Copied from delta-rs v0.25.5 (https://github.com/delta-io/delta-rs/blob/python-v0.25.5/LICENSE.txt)
+def get_file_stats_from_metadata(
+    metadata: Any,
+    num_indexed_cols: int,
+    columns_to_collect_stats: list[str] | None,
+) -> dict[str, int | dict[str, Any]]:
+    """Get Delta's file stats from PyArrow's Parquet file metadata."""
+    stats = {
+        "numRecords": metadata.num_rows,
+        "minValues": {},
+        "maxValues": {},
+        "nullCount": {},
+    }
+
+    def iter_groups(metadata: Any) -> Iterator[Any]:
+        for i in range(metadata.num_row_groups):
+            if metadata.row_group(i).num_rows > 0:
+                yield metadata.row_group(i)
+
+    schema_columns = metadata.schema.names
+    if columns_to_collect_stats is not None:
+        idx_to_iterate = []
+        for col in columns_to_collect_stats:
+            try:
+                idx_to_iterate.append(schema_columns.index(col))
+            except ValueError:
+                pass
+    elif num_indexed_cols == -1:
+        idx_to_iterate = list(range(metadata.num_columns))
+    elif num_indexed_cols >= 0:
+        idx_to_iterate = list(range(min(num_indexed_cols, metadata.num_columns)))
+    else:
+        raise ValueError("delta.dataSkippingNumIndexedCols valid values are >=-1")
+
+    for column_idx in idx_to_iterate:
+        name = metadata.row_group(0).column(column_idx).path_in_schema
+
+        # If stats missing, then we can't know aggregate stats
+        if all(
+            group.column(column_idx).is_stats_set for group in iter_groups(metadata)
+        ):
+            stats["nullCount"][name] = sum(
+                group.column(column_idx).statistics.null_count
+                for group in iter_groups(metadata)
+            )
+
+            # Min / max may not exist for some column types, or if all values are null
+            if any(
+                group.column(column_idx).statistics.has_min_max
+                for group in iter_groups(metadata)
+            ):
+                # Min and Max are recorded in physical type, not logical type
+                # https://stackoverflow.com/questions/66753485/decoding-parquet-min-max-statistics-for-decimal-type
+                # TODO: Add logic to decode physical type for DATE, DECIMAL
+
+                minimums = (
+                    group.column(column_idx).statistics.min
+                    for group in iter_groups(metadata)
+                )
+                # If some row groups have all null values, their min and max will be null too.
+                min_value = min(minimum for minimum in minimums if minimum is not None)
+                # Infinity cannot be serialized to JSON, so we skip it. Saying
+                # min/max is infinity is equivalent to saying it is null, anyways.
+                if min_value != -inf:
+                    stats["minValues"][name] = min_value
+                maximums = (
+                    group.column(column_idx).statistics.max
+                    for group in iter_groups(metadata)
+                )
+                max_value = max(maximum for maximum in maximums if maximum is not None)
+                if max_value != inf:
+                    stats["maxValues"][name] = max_value
+    return stats
+
+
+# Copied from delta-rs v0.25.5 (https://github.com/delta-io/delta-rs/blob/python-v0.25.5/LICENSE.txt)
+class DeltaJSONEncoder(json.JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, bytes):
+            return obj.decode("unicode_escape", "backslashreplace")
+        elif isinstance(obj, date):
+            return obj.isoformat()
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            return str(obj)
+        # Let the base class default method raise the TypeError
+        return json.JSONEncoder.default(self, obj)
+
+
+# Inspired from delta-rs v0.25.5 (https://github.com/delta-io/delta-rs/blob/python-v0.25.5/LICENSE.txt)
+def get_num_idx_cols_and_stats_columns(
+    table: DeltaTable | None, configuration: Mapping[str, str | None] | None
+) -> tuple[int, list[str] | None]:
+    """Get the num_idx_columns and stats_columns from the table configuration in the state
+
+    If table does not exist (only can occur in the first write action) it takes
+    the configuration that was passed.
+    """
+    if table is not None:
+        configuration = table.metadata().configuration
+    if configuration is None:
+        num_idx_cols = -1
+        stats_columns = None
+    else:
+        # Parse configuration
+        dataSkippingNumIndexedCols = configuration.get(
+            "delta.dataSkippingNumIndexedCols", "-1"
+        )
+        num_idx_cols = (
+            int(dataSkippingNumIndexedCols)
+            if dataSkippingNumIndexedCols is not None
+            else -1
+        )
+        columns = configuration.get("delta.dataSkippingStatsColumns", None)
+        if columns is not None:
+            stats_columns = [col.strip() for col in columns.split(",")]
+        else:
+            stats_columns = None
+    return num_idx_cols, stats_columns
