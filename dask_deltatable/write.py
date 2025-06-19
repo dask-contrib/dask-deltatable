@@ -15,18 +15,9 @@ import pyarrow.fs as pa_fs
 from dask.core import flatten
 from deltalake import CommitProperties, DeltaTable
 from deltalake import Schema as DeltaSchema
-
-try:
-    from deltalake.table import MAX_SUPPORTED_PYARROW_WRITER_VERSION
-except ImportError:
-    # Black and mypy were arguing when doing this in one line, the type: ignore kept moving around
-    from deltalake.table import MAX_SUPPORTED_WRITER_VERSION  # type: ignore
-
-    MAX_SUPPORTED_PYARROW_WRITER_VERSION = MAX_SUPPORTED_WRITER_VERSION
-    del MAX_SUPPORTED_WRITER_VERSION
-
 from deltalake.exceptions import DeltaProtocolError
 from deltalake.fs import DeltaStorageHandler
+from deltalake.table import MAX_SUPPORTED_PYARROW_WRITER_VERSION
 from deltalake.transaction import AddAction, create_table_with_add_actions
 from deltalake.writer.writer import try_get_table_and_table_uri
 from toolz.itertoolz import pluck
