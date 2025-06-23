@@ -379,10 +379,11 @@ def read_unity_catalog(
     """
     from databricks.sdk import WorkspaceClient
     from databricks.sdk.service.catalog import TableOperation
+
     try:
         workspace_client = WorkspaceClient(
-            host=os.environ.get(["DATABRICKS_HOST"], kwargs["databricks_host"]),
-            token=os.environ.get(["DATABRICKS_TOKEN"], kwargs["databricks_token"]),
+            host=os.environ.get("DATABRICKS_HOST", kwargs["databricks_host"]),
+            token=os.environ.get("DATABRICKS_TOKEN", kwargs["databricks_token"]),
         )
     except KeyError:
         raise ValueError(
@@ -407,6 +408,10 @@ def read_unity_catalog(
         file_path.replace("abfss://", "abfs://")
         for file_path in delta_table.file_uris()
     ]
-    ddf = dd.read_parquet(file_paths, **kwargs)
+    ddf = dd.read_parquet(
+        path=file_paths,
+        storage_options=storage_options,
+        **kwargs,
+    )
     return ddf
 
