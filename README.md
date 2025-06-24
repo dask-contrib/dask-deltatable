@@ -88,7 +88,7 @@ Example:
 ```python
 ddt.read_unity_catalog(
     catalog_name="projects",
-    database_name="science",
+    schema_name="science",
     table_name="physics"
 )
 ```

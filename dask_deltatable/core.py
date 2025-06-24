@@ -295,7 +295,7 @@ def read_deltalake(
 
 def read_unity_catalog(
     catalog_name: str,
-    database_name: str,
+    schema_name: str,
     table_name: str,
     **kwargs,
 ) -> dd.DataFrame:
@@ -310,10 +310,10 @@ def read_unity_catalog(
     ----------
     catalog_name : str
         Name of the Unity Catalog catalog.
-    database_name : str
-        Name of the database within the catalog.
+    schema_name : str
+        Name of the schema within the catalog.
     table_name : str
-        Name of the table within the database.
+        Name of the table within the catalog schema.
     **kwargs
         Additional keyword arguments passed to `dask.dataframe.read_parquet`.
         Some most used parameters can be passed here are:
@@ -390,7 +390,7 @@ def read_unity_catalog(
             "Please set `DATABRICKS_HOST` and `DATABRICKS_TOKEN` either as environment"
             " variables or as part of `kwargs` with lowercase"
         )
-    uc_full_url = f"{catalog_name}.{database_name}.{table_name}"
+    uc_full_url = f"{catalog_name}.{schema_name}.{table_name}"
     table = workspace_client.tables.get(uc_full_url)
     temp_credentials = workspace_client.temporary_table_credentials.\
         generate_temporary_table_credentials(
@@ -404,12 +404,8 @@ def read_unity_catalog(
         table_uri=table.storage_location,
         storage_options=storage_options
     )
-    file_paths = [
-        file_path.replace("abfss://", "abfs://")
-        for file_path in delta_table.file_uris()
-    ]
     ddf = dd.read_parquet(
-        path=file_paths,
+        path=delta_table.file_uris(),
         storage_options=storage_options,
         **kwargs,
     )
