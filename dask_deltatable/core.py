@@ -251,7 +251,8 @@ def read_deltalake(
             )
         else:
             raise NotImplementedError(
-                "Reading from catalog is not implemented yet, please use path"
+                "Reading from a catalog used to be supported ",
+                "but currently not due to a change in the upstream delta-rs dependency.",
             )
     else:
         if path is None:
