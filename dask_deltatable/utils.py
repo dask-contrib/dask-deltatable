@@ -250,7 +250,7 @@ class DeltaJSONEncoder(json.JSONEncoder):
 
 
 # Copied from delta-rs v0.25.5 (https://github.com/delta-io/delta-rs/blob/python-v0.25.5/LICENSE.txt)
-def _enforce_append_only(
+def enforce_append_only(
     table: DeltaTable | None,
     configuration: Mapping[str, str | None] | None,
     mode: str,
