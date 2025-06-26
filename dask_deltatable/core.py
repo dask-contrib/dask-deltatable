@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Sequence
 from typing import Any, Callable, cast
 
 import dask
 import dask.dataframe as dd
-import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from dask.base import tokenize
@@ -153,28 +151,6 @@ def _get_type_mapper(
     )
 
 
-# def _read_from_catalog(database_name: str, table_name: str, **kwargs) -> dd.DataFrame:
-#     if ("AWS_ACCESS_KEY_ID" not in os.environ) and (
-#         "AWS_SECRET_ACCESS_KEY" not in os.environ
-#     ):
-#         # defer's installing boto3 upfront !
-#         from boto3 import Session
-
-#         session = Session()
-#         credentials = session.get_credentials()
-#         assert credentials is not None
-#         current_credentials = credentials.get_frozen_credentials()
-#         os.environ["AWS_ACCESS_KEY_ID"] = current_credentials.access_key
-#         os.environ["AWS_SECRET_ACCESS_KEY"] = current_credentials.secret_key
-#     data_catalog = DataCatalog.AWS
-#     dt = DeltaTable.from_data_catalog(
-#         data_catalog=data_catalog, database_name=database_name, table_name=table_name
-#     )
-
-#     df = dd.read_parquet(dt.file_uris(), **kwargs)
-#     return df
-
-
 def read_deltalake(
     path: str | None = None,
     catalog: str | None = None,
@@ -274,9 +250,6 @@ def read_deltalake(
                 "Since Catalog was provided, please provide Database and table name"
             )
         else:
-            # resultdf = _read_from_catalog(
-            #     database_name=database_name, table_name=table_name, **kwargs
-            # )
             raise NotImplementedError(
                 "Reading from catalog is not implemented yet, please use path"
             )
