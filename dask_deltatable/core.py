@@ -252,7 +252,7 @@ def read_deltalake(
         else:
             raise NotImplementedError(
                 "Reading from a catalog used to be supported ",
-                "but currently not due to a change in the upstream delta-rs dependency.",
+                "but was removed from the upstream dependency delta-rs>=1.0.",
             )
     else:
         if path is None:
