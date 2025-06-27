@@ -58,7 +58,7 @@ jobs:
         if: >
           always() &&
           (steps.run_tests.outcome == 'success' || steps.run_tests.outcome == 'failure')
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: reports
 
