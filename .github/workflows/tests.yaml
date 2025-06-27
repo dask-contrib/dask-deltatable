@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0  # Needed by codecov.io
 
       - name: Setup Conda Environment
-        uses: conda-incubator/setup-miniconda@v2.2.0
+        uses: conda-incubator/setup-miniconda@v3.2.0
         with:
           miniforge-version: latest
           channel-priority: strict
