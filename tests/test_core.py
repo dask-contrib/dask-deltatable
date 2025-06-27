@@ -185,7 +185,8 @@ def test_catalog_with_error():
 
 
 @pytest.mark.skip(
-    reason="DeltaTable.from_data_catalog was removed in delta-rs v0.15.0. Skip until _read_from_catalog is adapted to this change."
+    reason="DeltaTable.from_data_catalog was removed in delta-rs v0.15.0. "
+    "Skip until _read_from_catalog is adapted to this change."
 )
 def test_catalog(simple_table):
     dt = MagicMock()
