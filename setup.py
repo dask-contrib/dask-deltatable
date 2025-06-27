@@ -23,6 +23,7 @@ setup(
     extras_require={
         "dev": ["pytest", "requests", "pytest-cov>=2.10.1"],
         "s3": ["s3fs", "boto3"],
+        "uc": ["adlfs", "databricks-sdk"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

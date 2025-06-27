@@ -48,7 +48,9 @@ df = ddt.read_deltalake("delta_path", version=3)
 df = ddt.read_deltalake("delta_path", datetime="2018-12-19T16:39:57-08:00")
 ```
 
-`df` is a Dask DataFrame that you can work with in the same way you normally would. See [the Dask DataFrame documentation](https://docs.dask.org/en/stable/dataframe.html) for available operations.
+`df` is a Dask DataFrame that you can work with in the same way you normally would. See
+[the Dask DataFrame documentation](https://docs.dask.org/en/stable/dataframe.html) for
+available operations.
 
 ### Accessing remote file systems
 
@@ -73,6 +75,22 @@ Example:
 
 ```python
 ddt.read_deltalake(catalog="glue", database_name="science", table_name="physics")
+```
+
+### Accessing Unity catalog
+
+`dask-deltatable` can connect to Unity catalog to read the delta table.
+The method will look for `DATABRICKS_HOST` and `DATABRICKS_TOKEN` environment
+variables or try to find them as `kwargs` with the same name but lowercase.
+
+Example:
+
+```python
+ddt.read_unity_catalog(
+    catalog_name="projects",
+    schema_name="science",
+    table_name="physics"
+)
 ```
 
 ### Writing to Delta Lake

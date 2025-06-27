@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from typing import Any, Callable, cast
 
@@ -175,8 +176,9 @@ def read_deltalake(
         path of Delta table directory
     catalog: Optional[str]
         Currently supports only AWS Glue Catalog
-        if catalog is provided, user has to provide database and table name, and delta-rs will fetch the
-        metadata from glue catalog, this is used by dask to read the parquet tables
+        if catalog is provided, user has to provide database and table name, and
+        delta-rs will fetch the metadata from glue catalog, this is used by dask to read
+        the parquet tables
     database_name: Optional[str]
         database name present in the catalog
     tablename: Optional[str]
@@ -207,7 +209,7 @@ def read_deltalake(
         2. filter
         3. pyarrow_to_pandas
 
-        schema : pyarrow.Schema
+        schema: pyarrow.Schema
             Used to maintain schema evolution in deltatable.
             delta protocol stores the schema string in the json log files which is
             converted into pyarrow.Schema and used for schema evolution
@@ -269,3 +271,120 @@ def read_deltalake(
             **kwargs,
         )
     return resultdf
+
+
+def read_unity_catalog(
+    catalog_name: str,
+    schema_name: str,
+    table_name: str,
+    **kwargs,
+) -> dd.DataFrame:
+    """
+    Read a Delta Table from Databricks Unity Catalog into a Dask DataFrame.
+
+    This function connects to Databricks using the WorkspaceClient and retrieves
+    temporary credentials to access the specified Unity Catalog table. It then
+    reads the Delta table's Parquet files into a Dask DataFrame.
+
+    Parameters
+    ----------
+    catalog_name : str
+        Name of the Unity Catalog catalog.
+    schema_name : str
+        Name of the schema within the catalog.
+    table_name : str
+        Name of the table within the catalog schema.
+    **kwargs
+        Additional keyword arguments passed to `dask.dataframe.read_parquet`.
+        Some most used parameters can be passed here are:
+        1. schema
+        2. filter
+        3. pyarrow_to_pandas
+        4. databricks_host
+        5. databricks_token
+
+        schema: pyarrow.Schema
+            Used to maintain schema evolution in deltatable.
+            delta protocol stores the schema string in the json log files which is
+            converted into pyarrow.Schema and used for schema evolution
+            i.e Based on particular version, some columns can be
+            shown or not shown.
+
+        filter: Union[List[Tuple[str, str, Any]], List[List[Tuple[str, str, Any]]]], default None
+            List of filters to apply, like ``[[('col1', '==', 0), ...], ...]``.
+            Can act as both partition as well as row based filter, above list of filters
+            converted into pyarrow.dataset.Expression built using pyarrow.dataset.Field
+            example:
+                [("x",">",400)] --> pyarrow.dataset.field("x")>400
+
+        pyarrow_to_pandas: dict
+            Options to pass directly to pyarrow.Table.to_pandas.
+            Common options include:
+            * categories: list[str]
+                List of columns to treat as pandas.Categorical
+            * strings_to_categorical: bool
+                Encode string (UTF8) and binary types to pandas.Categorical.
+            * types_mapper: Callable
+                A function mapping a pyarrow DataType to a pandas ExtensionDtype
+
+            See https://arrow.apache.org/docs/python/generated/pyarrow.Table.html#pyarrow.Table.to_pandas
+            for more.
+
+        databricks_host: str
+            The Databricks workspace URL hosting the Unity Catalog.
+
+        databricks_token: str
+            A Databricks personal access token with at least read access on the catalog.
+
+    Returns
+    -------
+    dask.dataframe.DataFrame
+        A Dask DataFrame representing the Delta table.
+
+    Notes
+    -----
+    Requires the following to be set as either environment variables or in `kwargs` as
+    lower case:
+    - DATABRICKS_HOST: The Databricks workspace URL hosting the Unity Catalog.
+    - DATABRICKS_TOKEN: A Databricks personal access token with at least read access on
+        the catalog.
+
+    Example
+    -------
+    >>> ddf = read_unity_catalog(
+            catalog_name="main",
+            database_name="my_db",
+            able_name="my_table",
+        )
+    """
+    from databricks.sdk import WorkspaceClient
+    from databricks.sdk.service.catalog import TableOperation
+
+    try:
+        workspace_client = WorkspaceClient(
+            host=os.environ.get("DATABRICKS_HOST", kwargs["databricks_host"]),
+            token=os.environ.get("DATABRICKS_TOKEN", kwargs["databricks_token"]),
+        )
+    except KeyError:
+        raise ValueError(
+            "Please set `DATABRICKS_HOST` and `DATABRICKS_TOKEN` either as environment"
+            " variables or as part of `kwargs` with lowercase"
+        )
+    uc_full_url = f"{catalog_name}.{schema_name}.{table_name}"
+    table = workspace_client.tables.get(uc_full_url)
+    temp_credentials = workspace_client.temporary_table_credentials.generate_temporary_table_credentials(
+        operation=TableOperation.READ,
+        table_id=table.table_id,
+    )
+    storage_options = {
+        "sas_token": temp_credentials.azure_user_delegation_sas.sas_token
+    }
+    delta_table = DeltaTable(
+        table_uri=table.storage_location, storage_options=storage_options
+    )
+    ddf = dd.read_parquet(
+        path=delta_table.file_uris(),
+        storage_options=storage_options,
+        **kwargs,
+    )
+    return ddf
