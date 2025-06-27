@@ -144,7 +144,7 @@ def to_deltalake(
     if table:  # already exists
         if (
             schema is not None
-            and DeltaSchema.from_arrow(schema) != table.schema()
+            and schema != pa.schema(table.schema())
             and not (mode == "overwrite" and overwrite_schema)
         ):
             raise ValueError(
