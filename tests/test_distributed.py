@@ -45,6 +45,19 @@ def test_write(client, tmpdir):
     ddt.to_deltalake(f"{tmpdir}", ddf)
 
 
+def test_append(client, tmpdir):
+    """Ensure that a DeltaTable can be pickled and sent over to a worker for appending."""
+    ddf = timeseries(
+        start="2023-01-01",
+        end="2023-01-03",
+        freq="1H",
+        partition_freq="1D",
+        dtypes={"str": object, "float": float, "int": int},
+    ).reset_index()
+    ddt.to_deltalake(f"{tmpdir}", ddf)
+    ddt.to_deltalake(f"{tmpdir}", ddf, mode="append")
+
+
 def test_write_with_options(client, tmpdir):
     file_options = dict(compression="gzip")
     ddf = timeseries(
