@@ -197,7 +197,7 @@ def to_deltalake(
         filesystem=filesystem,
         max_partitions=max_partitions,
         meta=(None, object),
-        table=table,
+        table=DaskDeltaTable.from_delta_table(table) if table else None,
         configuration=configuration,
     )
     result = dask.delayed(_commit, name="deltatable-commit")(
@@ -343,3 +343,35 @@ def _write_partition(
         max_partitions=max_partitions,
     )
     return schema, add_actions
+
+
+class DaskDeltaTable(DeltaTable):
+    @classmethod
+    def from_delta_table(
+        cls,
+        table: DeltaTable,
+    ) -> DaskDeltaTable:
+        config = table.table_config
+        return cls(
+            table_uri=table.table_uri,
+            version=table.version(),
+            storage_options=table._storage_options,
+            without_files=config.without_files,
+            log_buffer_size=config.log_buffer_size,
+        )
+
+    def __reduce__(self) -> tuple[type, tuple[Any, ...]]:
+        """
+        This allows DeltaTable to be pickled.
+        """
+        config = self.table_config
+        return (
+            self.__class__,
+            (
+                self.table_uri,
+                self.version(),
+                self._storage_options,
+                config.without_files,
+                config.log_buffer_size,
+            ),
+        )
