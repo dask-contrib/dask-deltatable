@@ -136,7 +136,7 @@ def _read_from_filesystem(
 
 
 def _get_type_mapper(
-    user_types_mapper: dict[str, Any] | None
+    user_types_mapper: dict[str, Any] | None,
 ) -> Callable[[Any], Any] | None:
     """
     Set the type mapper for the schema

@@ -161,7 +161,7 @@ def _determine_schemas_to_compare(
         # The reference has enough information to validate against current schema.
         # Append it to the list of schemas to be verified
         elif null_cols_in_reference.issubset(null_columns):
-            schemas_to_evaluate.append((current, null_columns))
+            schemas_to_evaluate.append((current, list(null_columns)))
         # current schema includes all information of reference and more.
         # Add reference to schemas_to_evaluate and update reference
         elif null_columns.issubset(null_cols_in_reference):
@@ -185,7 +185,7 @@ def _determine_schemas_to_compare(
                 # isn't relevant where the reference comes from.
                 reference = _swap_fields_by_name(reference, current, col)
                 null_cols_in_reference.remove(col)
-            schemas_to_evaluate.append((current, null_columns))
+            schemas_to_evaluate.append((current, list(null_columns)))
 
     assert (reference is not None) or (not schemas_to_evaluate)
 
