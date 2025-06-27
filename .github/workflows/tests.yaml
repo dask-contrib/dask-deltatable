@@ -60,6 +60,7 @@ jobs:
           (steps.run_tests.outcome == 'success' || steps.run_tests.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
+          name: my-artifacts-${{ strategy.job-index }}
           path: reports
 
       - name: Upload coverage to Codecov
