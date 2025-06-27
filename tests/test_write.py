@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 from dask.dataframe.utils import assert_eq
 from dask.datasets import timeseries
+from deltalake import DeltaTable
 
 from dask_deltatable import read_deltalake
 from dask_deltatable.write import to_deltalake
@@ -86,3 +87,13 @@ def test_datetime(tmpdir, unit):
     ddf_read = read_deltalake(tmpdir)
     ddf_dask = dd.read_parquet(tmpdir)
     assert_eq(ddf_read, ddf_dask, check_index=False)
+
+
+def test_custom_metadata(tmpdir):
+    tmpdir = str(tmpdir)
+    df = pd.DataFrame({"a": [1, 2, 3, 4]})
+    ddf = dd.from_pandas(df, npartitions=2)
+    to_deltalake(tmpdir, ddf, custom_metadata={"foo": "bar"})
+    dt = DeltaTable(tmpdir)
+    assert "foo" in dt.history()[-1]
+    assert dt.history()[-1]["foo"] == "bar"

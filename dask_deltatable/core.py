@@ -11,7 +11,7 @@ import pyarrow.parquet as pq
 from dask.base import tokenize
 from dask.dataframe.io.parquet.arrow import ArrowDatasetEngine
 from dask.dataframe.utils import make_meta
-from deltalake import DataCatalog, DeltaTable
+from deltalake import DeltaTable
 from fsspec.core import get_fs_token_paths
 from packaging.version import Version
 from pyarrow import dataset as pa_ds
@@ -105,7 +105,7 @@ def _read_from_filesystem(
     if datetime is not None:
         dt.load_as_version(datetime)
 
-    schema = dt.schema().to_pyarrow()
+    schema = pa.schema(dt.schema().to_arrow())
 
     filter_value = cast(Filters, kwargs.get("filter", None))
     pq_files = _get_pq_files(dt, filter=filter_value)
@@ -116,7 +116,7 @@ def _read_from_filesystem(
     mapper_kwargs["types_mapper"] = _get_type_mapper(
         mapper_kwargs.get("types_mapper", None)
     )
-    meta = make_meta(schema.empty_table().to_pandas(**mapper_kwargs))
+    meta = make_meta(pa.table(schema.empty_table()).to_pandas(**mapper_kwargs))
     if columns:
         meta = meta[columns]
 
@@ -137,7 +137,7 @@ def _read_from_filesystem(
 
 
 def _get_type_mapper(
-    user_types_mapper: dict[str, Any] | None
+    user_types_mapper: dict[str, Any] | None,
 ) -> Callable[[Any], Any] | None:
     """
     Set the type mapper for the schema
@@ -150,28 +150,6 @@ def _get_type_mapper(
         convert_string=convert_string,
         arrow_to_pandas={"types_mapper": user_types_mapper},
     )
-
-
-def _read_from_catalog(database_name: str, table_name: str, **kwargs) -> dd.DataFrame:
-    if ("AWS_ACCESS_KEY_ID" not in os.environ) and (
-        "AWS_SECRET_ACCESS_KEY" not in os.environ
-    ):
-        # defer's installing boto3 upfront !
-        from boto3 import Session
-
-        session = Session()
-        credentials = session.get_credentials()
-        assert credentials is not None
-        current_credentials = credentials.get_frozen_credentials()
-        os.environ["AWS_ACCESS_KEY_ID"] = current_credentials.access_key
-        os.environ["AWS_SECRET_ACCESS_KEY"] = current_credentials.secret_key
-    data_catalog = DataCatalog.AWS
-    dt = DeltaTable.from_data_catalog(
-        data_catalog=data_catalog, database_name=database_name, table_name=table_name
-    )
-
-    df = dd.read_parquet(dt.file_uris(), **kwargs)
-    return df
 
 
 def read_deltalake(
@@ -274,8 +252,9 @@ def read_deltalake(
                 "Since Catalog was provided, please provide Database and table name"
             )
         else:
-            resultdf = _read_from_catalog(
-                database_name=database_name, table_name=table_name, **kwargs
+            raise NotImplementedError(
+                "Reading from a catalog used to be supported ",
+                "but was removed from the upstream dependency delta-rs>=1.0.",
             )
     else:
         if path is None:
@@ -292,6 +271,7 @@ def read_deltalake(
             **kwargs,
         )
     return resultdf
+
 
 def read_unity_catalog(
     catalog_name: str,
@@ -392,17 +372,15 @@ def read_unity_catalog(
         )
     uc_full_url = f"{catalog_name}.{schema_name}.{table_name}"
     table = workspace_client.tables.get(uc_full_url)
-    temp_credentials = workspace_client.temporary_table_credentials.\
-        generate_temporary_table_credentials(
-            operation=TableOperation.READ,
-            table_id=table.table_id,
-        )
+    temp_credentials = workspace_client.temporary_table_credentials.generate_temporary_table_credentials(
+        operation=TableOperation.READ,
+        table_id=table.table_id,
+    )
     storage_options = {
         "sas_token": temp_credentials.azure_user_delegation_sas.sas_token
     }
     delta_table = DeltaTable(
-        table_uri=table.storage_location,
-        storage_options=storage_options
+        table_uri=table.storage_location, storage_options=storage_options
     )
     ddf = dd.read_parquet(
         path=delta_table.file_uris(),
@@ -410,4 +388,3 @@ def read_unity_catalog(
         **kwargs,
     )
     return ddf
-
