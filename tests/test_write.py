@@ -5,6 +5,7 @@ import unittest.mock as mock
 
 import dask.dataframe as dd
 import pandas as pd
+import pyarrow as pa
 import pytest
 from dask.dataframe.utils import assert_eq
 from dask.datasets import timeseries
@@ -97,3 +98,13 @@ def test_custom_metadata(tmpdir):
     dt = DeltaTable(tmpdir)
     assert "foo" in dt.history()[-1]
     assert dt.history()[-1]["foo"] == "bar"
+
+
+def test_append_with_schema(tmpdir):
+    """Ensure we can append to a table with a schema"""
+    tmpdir = str(tmpdir)
+    df = pd.DataFrame({"a": [1, 2, 3, 4]})
+    ddf = dd.from_pandas(df, npartitions=2)
+    schema = pa.Schema.from_pandas(df)
+    to_deltalake(tmpdir, ddf, schema=schema)
+    to_deltalake(tmpdir, ddf, schema=schema, mode="append")

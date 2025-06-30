@@ -105,7 +105,7 @@ def _read_from_filesystem(
     if datetime is not None:
         dt.load_as_version(datetime)
 
-    schema = pa.schema(dt.schema().to_arrow())
+    schema = pa.schema(dt.schema())
 
     filter_value = cast(Filters, kwargs.get("filter", None))
     pq_files = _get_pq_files(dt, filter=filter_value)
