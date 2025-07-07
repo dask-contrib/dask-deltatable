@@ -201,7 +201,7 @@ def to_deltalake(
         configuration=configuration,
     )
     result = dask.delayed(_commit, name="deltatable-commit")(
-        table,
+        DaskDeltaTable.from_delta_table(table) if table else None,
         written,
         table_uri,
         schema,
